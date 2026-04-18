@@ -255,6 +255,25 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
 .pika-payouts td{padding:.2rem .4rem}
 .pika-payouts tr:nth-child(even){background:rgba(255,255,255,.03)}
 
+/* ── Game animations ─────────────────────────────────────────────────────── */
+@keyframes flipIn{
+  0%{transform:perspective(400px) rotateY(90deg);opacity:0}
+  60%{transform:perspective(400px) rotateY(-12deg);opacity:1}
+  100%{transform:perspective(400px) rotateY(0deg)}
+}
+@keyframes coinSpin{
+  0%{transform:perspective(300px) rotateY(0deg) scale(1)}
+  50%{transform:perspective(300px) rotateY(900deg) scale(1.25)}
+  100%{transform:perspective(300px) rotateY(1800deg) scale(1)}
+}
+@keyframes popIn{
+  0%{transform:scale(.82);opacity:0}
+  70%{transform:scale(1.04)}
+  100%{transform:scale(1);opacity:1}
+}
+.coin-anim{font-size:3.5rem;display:inline-block;animation:coinSpin .9s ease-out forwards}
+.game-result{animation:popIn .3s ease both}
+
 /* ── Claimed notification ─────────────────────────────────────────────────── */
 .claim-banner{
   position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-40px);
@@ -1145,22 +1164,23 @@ function switchGameTab(which){
   });
 }
 
-function renderMiniCard(card, size='sm'){
+function renderMiniCard(card, size='sm', delayMs=-1){
   if(!card||!card.rank) return `<div class="card back ${size}"></div>`;
   const red = card.suit==='♥'||card.suit==='♦';
-  return `<div class="card ${red?'red':'black'} ${size}">
+  const anim = delayMs >= 0 ? ` style="animation:flipIn .45s ${delayMs}ms ease both"` : '';
+  return `<div class="card ${red?'red':'black'} ${size}"${anim}>
     <div class="corner tl">${card.rank}<br>${card.suit}</div>
     <div class="center">${card.suit}</div>
     <div class="corner br">${card.rank}<br>${card.suit}</div>
   </div>`;
 }
 
-function showGameResult(elId, outcome, headline, detail, netPts){
+function showGameResult(elId, outcome, headline, detail, netPts, prefixHtml=''){
   const el=$(elId);
   const cls = outcome==='win'?'win':outcome==='push'?'push':'loss';
   const emoji = outcome==='win'?'🏆':outcome==='push'?'🤝':'😞';
   const netStr = netPts>0?`+${netPts}`:String(netPts);
-  el.innerHTML = `<div class="game-result ${cls}">
+  el.innerHTML = prefixHtml + `<div class="game-result ${cls}">
     <div class="res-emoji">${emoji}</div>
     <div class="res-outcome">${headline}</div>
     <div class="res-detail">${detail}</div>
@@ -1187,13 +1207,15 @@ function cfChoose(c){
 async function doCoinflip(){
   const bet=getBet('cf-bet'); if(!bet) return;
   const btn=$('cf-btn'); btn.disabled=true; btn.textContent='…';
+  $('cf-result').innerHTML='<div style="text-align:center;padding:.4rem 0"><div class="coin-anim">🪙</div></div>';
+  $('cf-result').style.display='block';
   try{
     const r=await fetch(`/api/points/${player.id}/coinflip`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({bet,choice:cfChoice})
     });
     const d=await r.json();
-    if(!r.ok){alert(d.error);return;}
+    if(!r.ok){alert(d.error);$('cf-result').innerHTML='';return;}
     player.points=d.points;
     const resultName = d.result==='heads'?'👑 Kruuna':'🦅 Klaava';
     showGameResult('cf-result', d.outcome,
@@ -1216,16 +1238,16 @@ async function doWar(){
     const d=await r.json();
     if(!r.ok){alert(d.error);return;}
     player.points=d.points;
-    $('war-result').innerHTML = `
-      <div class="mini-cards">${renderMiniCard(d.player_card,'md')}
-        <span style="font-size:1.5rem;align-self:center;color:var(--muted)">vs</span>
-        ${renderMiniCard(d.dealer_card,'md')}</div>`;
+    const cardsHtml=`<div class="mini-cards" style="margin:.5rem 0">
+      ${renderMiniCard(d.player_card,'md',0)}
+      <span style="font-size:1.5rem;align-self:center;color:var(--muted)">vs</span>
+      ${renderMiniCard(d.dealer_card,'md',250)}
+    </div>`;
     showGameResult('war-result', d.outcome,
       d.outcome==='win'?'Voitit!':d.outcome==='push'?'Tasapeli!':'Hävisit',
       `Sinun: ${d.player_card.rank}${d.player_card.suit} · Jakaja: ${d.dealer_card.rank}${d.dealer_card.suit}`,
-      d.net
+      d.net, cardsHtml
     );
-    $('war-result').querySelector('.mini-cards').style.marginTop='.5rem';
   }catch(e){alert('Virhe.');}
   finally{btn.disabled=false;btn.textContent='Pelaa WAR';}
 }
@@ -1247,24 +1269,23 @@ async function doBaccarat(){
     const d=await r.json();
     if(!r.ok){alert(d.error);return;}
     player.points=d.points;
-    const ph=d.player_hand.map(c=>renderMiniCard(c,'sm')).join('');
-    const bh=d.banker_hand.map(c=>renderMiniCard(c,'sm')).join('');
+    const ph=d.player_hand.map((c,i)=>renderMiniCard(c,'sm',i*150)).join('');
+    const bh=d.banker_hand.map((c,i)=>renderMiniCard(c,'sm',d.player_hand.length*150+i*150)).join('');
     const sideLabels={player:'Pelaaja',banker:'Bankeri',tie:'Tasapeli'};
     const winnerLabel=sideLabels[d.winner]||d.winner;
-    $('bac-result').innerHTML=`
-      <div style="display:flex;gap:1rem;justify-content:center;margin:.6rem 0;flex-wrap:wrap">
-        <div style="text-align:center">
-          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">PELAAJA (${d.player_total})</div>
-          <div class="mini-cards" style="justify-content:center">${ph}</div>
-        </div>
-        <div style="text-align:center">
-          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">BANKERI (${d.banker_total})</div>
-          <div class="mini-cards" style="justify-content:center">${bh}</div>
-        </div>
-      </div>`;
+    const cardsHtml=`<div style="display:flex;gap:1rem;justify-content:center;margin:.6rem 0;flex-wrap:wrap">
+      <div style="text-align:center">
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">PELAAJA (${d.player_total})</div>
+        <div class="mini-cards" style="justify-content:center">${ph}</div>
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">BANKERI (${d.banker_total})</div>
+        <div class="mini-cards" style="justify-content:center">${bh}</div>
+      </div>
+    </div>`;
     showGameResult('bac-result', d.outcome,
       d.outcome==='win'?`Voitit! (${winnerLabel} voitti)`:d.outcome==='push'?`Tasapeli — palautus`:`Hävisit (${winnerLabel} voitti)`,
-      `Panos: ${bet} p · Voitto: ${d.payout} p`, d.net
+      `Panos: ${bet} p · Voitto: ${d.payout} p`, d.net, cardsHtml
     );
   }catch(e){alert('Virhe.');}
   finally{btn.disabled=false;btn.textContent='Pelaa Baccarat';}
@@ -1272,9 +1293,11 @@ async function doBaccarat(){
 
 // ── Blackjack ────────────────────────────────────────────────────────────────
 let bjGameId = null;
+let prevBjPlayerCount = 0;
+let prevBjActive = null; // null=no game, true=in-progress, false=finished
 
 function bjReset(){
-  bjGameId=null;
+  bjGameId=null; prevBjPlayerCount=0; prevBjActive=null;
   $('bj-start-area').style.display='block';
   $('bj-game-area').style.display='none';
   $('bj-result').innerHTML='';
@@ -1284,16 +1307,33 @@ function bjReset(){
 
 function renderBjState(d, resultHtml=''){
   const pc=d.player_cards||[]; const dc=d.dealer_cards||[];
-  $('bj-player-cards').innerHTML=pc.map(c=>renderMiniCard(c,'md')).join('');
-  $('bj-dealer-cards').innerHTML=dc.map((c,i)=>(i===0||d.status!=='active')?renderMiniCard(c,'md'):'<div class="card back md"></div>').join('');
+  const isActive=d.status==='active';
+
+  // Player cards: animate only newly dealt ones
+  $('bj-player-cards').innerHTML=pc.map((c,i)=>{
+    const isNew=i>=prevBjPlayerCount;
+    return renderMiniCard(c,'md',isNew?(i-prevBjPlayerCount)*200:-1);
+  }).join('');
+
+  // Dealer cards: animate face-up card on initial deal; animate all on reveal
+  $('bj-dealer-cards').innerHTML=dc.map((c,i)=>{
+    if(isActive&&i>0) return '<div class="card back md"></div>';
+    let delay=-1;
+    if(prevBjActive===null&&i===0) delay=pc.length*200; // initial deal: after player cards
+    if(prevBjActive===true&&!isActive) delay=i*200;     // reveal: stagger all dealer cards
+    return renderMiniCard(c,'md',delay);
+  }).join('');
+
   $('bj-player-total').textContent=`Yhteensä: ${d.player_total}`;
-  $('bj-dealer-total').textContent=d.status==='active'?`Näkyy: ${d.dealer_total}`:`Yhteensä: ${d.dealer_total}`;
-  const active=d.status==='active';
-  $('bj-hit').disabled=!active;
-  $('bj-stand').disabled=!active;
-  $('bj-double').disabled=!active;
+  $('bj-dealer-total').textContent=isActive?`Näkyy: ${d.dealer_total}`:`Yhteensä: ${d.dealer_total}`;
+  $('bj-hit').disabled=!isActive;
+  $('bj-stand').disabled=!isActive;
+  $('bj-double').disabled=!isActive;
   if(resultHtml) $('bj-result').innerHTML=resultHtml;
-  if(!active) $('bj-new-btn').style.display='block';
+  if(!isActive) $('bj-new-btn').style.display='block';
+
+  prevBjPlayerCount=pc.length;
+  prevBjActive=isActive;
 }
 
 async function doBlackjackStart(){
@@ -1358,12 +1398,15 @@ function pikaReset(){
   $('pika-deal-btn').disabled=false;
 }
 
-function renderPikaHand(hand, allowToggle){
+function renderPikaHand(hand, allowToggle, newCardIndices=null){
+  let newCount=0;
   return hand.map((card,i)=>{
     const held=pikaHeld.has(i);
+    let delay=-1;
+    if(newCardIndices!==null&&newCardIndices.has(i)){delay=newCount*150;newCount++;}
     return `<div class="pika-card-wrap ${held?'held':''}" ${allowToggle?`onclick="pikaToggleHold(${i})"`:'id=""'}>
       <div class="hold-label">PIDÄ</div>
-      ${renderMiniCard(card,'md')}
+      ${renderMiniCard(card,'md',delay)}
     </div>`;
   }).join('');
 }
@@ -1388,7 +1431,7 @@ async function doPikaDeal(){
     $('pika-game-area').style.display='block';
     const handEl=$('pika-hand');
     handEl.dataset.hand=JSON.stringify(d.hand);
-    handEl.innerHTML=renderPikaHand(d.hand, true);
+    handEl.innerHTML=renderPikaHand(d.hand, true, new Set([0,1,2,3,4]));
     $('pika-result').innerHTML='';
     $('pika-draw-btn').disabled=false;
     $('pika-new-btn').style.display='none';
@@ -1398,6 +1441,7 @@ async function doPikaDeal(){
 
 async function doPikaDraw(){
   if(!pikaGameId) return;
+  const heldAtDraw=new Set(pikaHeld);
   const btn=$('pika-draw-btn'); btn.disabled=true;
   try{
     const r=await fetch(`/api/points/pikapokeri/${pikaGameId}/draw`,{
@@ -1407,8 +1451,9 @@ async function doPikaDraw(){
     const d=await r.json();
     if(!r.ok){alert(d.error);btn.disabled=false;return;}
     player.points=d.points;
+    const newIndices=new Set([0,1,2,3,4].filter(i=>!heldAtDraw.has(i)));
     $('pika-hand').dataset.hand=JSON.stringify(d.hand);
-    $('pika-hand').innerHTML=renderPikaHand(d.hand, false);
+    $('pika-hand').innerHTML=renderPikaHand(d.hand, false, newIndices);
     const cls=d.outcome==='win'?'win':'loss';
     const emoji=d.outcome==='win'?'🏆':'😞';
     $('pika-result').innerHTML=`<div class="game-result ${cls}">
