@@ -128,6 +128,7 @@ def init_db():
             created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (player_id) REFERENCES players(id)
         )""",
+        "ALTER TABLE blackjack_games ADD COLUMN insurance_bet INTEGER DEFAULT 0",
     ]
     for m in migrations:
         try:
@@ -1107,16 +1108,25 @@ def game_baccarat(pid):
 
 # ── Blackjack (stateful) ──
 def _bj_state(game):
-    pcards = json.loads(game['player_cards_json'])
-    dcards = json.loads(game['dealer_cards_json'])
+    pcards  = json.loads(game['player_cards_json'])
+    dcards  = json.loads(game['dealer_cards_json'])
+    ins_bet = game['insurance_bet'] if game['insurance_bet'] is not None else 0
+    active  = game['status'] == 'active'
     return {
-        'game_id': game['id'],
-        'bet':     game['bet'],
-        'status':  game['status'],
+        'game_id':      game['id'],
+        'bet':          game['bet'],
+        'status':       game['status'],
         'player_cards': pcards,
-        'dealer_cards': dcards if game['status'] != 'active' else [dcards[0]] + [{'rank':'?','suit':'?'}]*(len(dcards)-1),
+        'dealer_cards': dcards if not active else [dcards[0]] + [{'rank':'?','suit':'?'}]*(len(dcards)-1),
         'player_total': _hand_total(pcards),
-        'dealer_total': _hand_total(dcards) if game['status'] != 'active' else _hand_total([dcards[0]]),
+        'dealer_total': _hand_total(dcards) if not active else _hand_total([dcards[0]]),
+        'insurance_available': (
+            active and
+            len(pcards) == 2 and
+            dcards[0]['rank'] == 'A' and
+            ins_bet == 0
+        ),
+        'insurance_bet': ins_bet,
     }
 
 @app.route('/api/points/<int:pid>/blackjack/start', methods=['POST'])
@@ -1211,6 +1221,58 @@ def game_bj_action(gid):
                 status = 'done_push'; outcome = 'push'; payout = bet
             else:
                 status = 'done_loss'; outcome = 'loss'
+    elif action == 'insurance':
+        if len(pcards) != 2:
+            return jsonify({'error': 'Vakuutus on mahdollinen vain pelin alussa.'}), 400
+        if dcards[0]['rank'] != 'A':
+            return jsonify({'error': 'Vakuutus on mahdollinen vain kun jakajalla on ässä.'}), 400
+        if game['insurance_bet'] and game['insurance_bet'] > 0:
+            return jsonify({'error': 'Vakuutus on jo otettu.'}), 400
+        ins = max(1, bet // 2)
+        if _atomic_deduct_points(db, pid, ins, 'Blackjack vakuutuspanos') is None:
+            return jsonify({'error': 'Ei tarpeeksi pisteitä vakuutukseen.'}), 400
+        dealer_bj = _hand_total(dcards) == 21
+        if dealer_bj:
+            ins_payout = ins * 3  # 2:1 pays: get stake back + 2× profit
+            _add_points(db, pid, ins_payout, 'Blackjack vakuutus voitto')
+            if _hand_total(pcards) == 21:
+                # Both have BJ — push on main hand
+                _add_points(db, pid, bet, 'Blackjack tasapeli (BJ vs BJ)')
+                status = 'done_push'; outcome = 'push'; payout = bet
+            else:
+                status = 'done_loss'; outcome = 'loss'; payout = 0
+            # Apply streak override
+            streak = _get_streak_mode(db, pid)
+            if streak == 'win' and outcome == 'loss':
+                # Force win: refund bet too
+                _add_points(db, pid, bet * 2, 'Blackjack voitto (streak)')
+                outcome = 'win'; status = 'done_win'; payout = bet * 2
+            net_total = (ins_payout - ins) + (payout - bet)
+        else:
+            ins_payout = 0
+            outcome    = None
+            status     = 'active'
+            net_total  = -ins
+        db.execute(
+            'UPDATE blackjack_games SET insurance_bet=?,status=? WHERE id=?',
+            (ins, status, gid)
+        )
+        db.commit()
+        game  = db.execute('SELECT * FROM blackjack_games WHERE id=?', (gid,)).fetchone()
+        state = _bj_state(game)
+        bal   = db.execute('SELECT points FROM players WHERE id=?', (pid,)).fetchone()['points'] or 0
+        state['points']           = bal
+        state['dealer_has_bj']    = dealer_bj
+        state['insurance_result'] = 'win' if dealer_bj else 'loss'
+        state['insurance_payout'] = ins_payout
+        state['insurance_amount'] = ins
+        if dealer_bj and outcome:
+            state['outcome'] = outcome
+            state['payout']  = payout
+            state['net']     = net_total
+        else:
+            state['net'] = net_total
+        return jsonify(state)
     else:
         return jsonify({'error': 'Virheellinen toiminto.'}), 400
 
