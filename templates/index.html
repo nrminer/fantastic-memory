@@ -195,6 +195,15 @@ select.form-control option{background:var(--bg2)}
 .preset-seat-row:last-child{border-bottom:none}
 .preset-seat-label{font-weight:600;font-size:.85rem;min-width:90px}
 .preset-cards-display{display:flex;gap:.3rem}
+.comm-slot{width:38px;height:54px;border-radius:5px;border:2px dashed rgba(255,255,255,.15);background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.65rem;color:var(--muted);transition:border-color .15s}
+.comm-slot:hover,.comm-slot.active{border-color:var(--gold);color:var(--gold)}
+.comm-slot.active{box-shadow:0 0 8px rgba(201,168,76,.5)}
+
+/* ── Card flip animation (community reveal) ───────────────────────────────── */
+@keyframes flipIn{
+  from{transform:perspective(500px) rotateY(90deg) scale(.92);opacity:0}
+  to  {transform:perspective(500px) rotateY(0deg)  scale(1);  opacity:1}
+}
 
 /* ── Dash cols ────────────────────────────────────────────────────────────── */
 .dash-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem}
@@ -293,6 +302,7 @@ select.form-control option{background:var(--bg2)}
       <li class="active" data-view="dashboard"><span class="nav-icon">📊</span> Kojelauta</li>
       <li data-view="players"><span class="nav-icon">👥</span> Pelaajat</li>
       <li data-view="poker"><span class="nav-icon">♠</span> Pokeripöytä</li>
+      <li data-view="settings"><span class="nav-icon">⚙️</span> Asetukset</li>
     </ul>
   </nav>
   <div class="sidebar-footer">v2.1 · Paikallinen · SQLite</div>
@@ -355,6 +365,8 @@ select.form-control option{background:var(--bg2)}
           <th class="col-hide-sm">Puhelin</th>
           <th>Saldo</th>
           <th class="col-hide-sm">Hävitty</th>
+          <th>Pisteet</th>
+          <th>Putki</th>
           <th class="col-hide-sm">Tapahtumat</th>
           <th></th>
         </tr></thead>
@@ -414,6 +426,41 @@ select.form-control option{background:var(--bg2)}
         <button class="btn btn-ghost btn-sm" onclick="$('hand-results').style.display='none'">✕ Sulje</button>
       </div>
       <div class="panel-body" id="hand-results-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ASETUKSET ═══ -->
+<section id="view-settings" class="view">
+  <div class="page-header">
+    <h1>Asetukset</h1>
+    <button class="btn btn-ghost btn-sm" onclick="loadSettings()">↻ Lataa</button>
+  </div>
+  <div class="panel" style="max-width:640px">
+    <div class="panel-header"><h3>🪙 Pistejärjestelmä</h3></div>
+    <div class="panel-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Pisteitä per €1</label>
+          <input class="form-control" id="s-ppu" type="number" step="1" min="1" placeholder="10">
+          <span class="hint">Esim. 10 → 100 pistettä = €10</span>
+        </div>
+        <div class="form-group">
+          <label>Vähimmäislunastus (pistettä)</label>
+          <input class="form-control" id="s-min" type="number" step="100" min="0" placeholder="500">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Enimmäislunastus per kerta (pistettä)</label>
+          <input class="form-control" id="s-max" type="number" step="100" min="0" placeholder="5000">
+        </div>
+        <div class="form-group">
+          <label>Pisteiden vanheneminen (päivää)</label>
+          <input class="form-control" id="s-exp" type="number" step="1" min="0" placeholder="365">
+        </div>
+      </div>
+      <button class="btn btn-gold" onclick="saveSettings()">💾 Tallenna asetukset</button>
     </div>
   </div>
 </section>
@@ -599,6 +646,32 @@ select.form-control option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- ═══ MODAL: Anna/vähennä pisteitä ═══ -->
+<div class="modal-overlay" id="modal-grant-points">
+  <div class="modal-box" style="width:min(420px,96vw)">
+    <div class="modal-head">
+      <h2>🪙 Hallinnoi pisteitä</h2>
+      <button class="modal-close" onclick="closeModal('modal-grant-points')">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="grant-pts-player-label" style="color:var(--muted);font-size:.9rem;margin-bottom:.75rem"></p>
+      <p style="font-size:.82rem;margin-bottom:1rem">Pisteet nyt: <strong id="grant-pts-current">0</strong></p>
+      <div class="form-group">
+        <label>Määrä (negatiivinen = vähennys)</label>
+        <input class="form-control" id="grant-pts-count" type="number" step="1" placeholder="esim. 500 tai -200">
+      </div>
+      <div class="form-group">
+        <label>Syy (kirjataan lokiin)</label>
+        <input class="form-control" id="grant-pts-reason" placeholder="esim. Tervetuliaisbonus" maxlength="120">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-grant-points')">Peruuta</button>
+      <button class="btn btn-gold" onclick="doGrantPoints()">Tallenna →</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ MODAL: Ennalta asetetut kädet ═══ -->
 <div class="modal-overlay" id="modal-preset">
   <div class="modal-box" style="width:min(800px,96vw)">
@@ -608,6 +681,25 @@ select.form-control option{background:var(--bg2)}
     </div>
     <div class="modal-body">
       <p class="text-muted text-sm" style="margin-bottom:1rem">Valitse enintään 2 korttia per pelaaja. Pelaajat joille ei ole asetettu kortteja saavat satunnaiset kortit.</p>
+      <!-- Community cards -->
+      <div style="margin-bottom:1.1rem">
+        <h3 style="font-family:'Playfair Display',serif;color:var(--gold);font-size:1rem;margin-bottom:.65rem">🂠 Yhteiskortit (ennalta)</h3>
+        <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap" id="comm-preset-row">
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Flop</div>
+            <div style="display:flex;gap:.3rem" id="comm-flop-slots"></div>
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Turn</div>
+            <div id="comm-turn-slot"></div>
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">River</div>
+            <div id="comm-river-slot"></div>
+          </div>
+        </div>
+      </div>
+
       <div id="preset-seats-list"></div>
       <hr class="divider">
       <h3 style="font-family:'Playfair Display',serif;color:var(--gold);font-size:1rem;margin-bottom:.75rem">Korttipakka</h3>
@@ -632,6 +724,7 @@ let S = {
   detailPlayerId: null, pokerInterval: null,
   giveBonusPlayerId: null,
   grantSpinsPlayerId: null,
+  grantPointsPlayerId: null,
   presets: {}, activePick: null,
 };
 
@@ -675,6 +768,7 @@ function showView(name){
   closeSidebar();
   if(name==='dashboard') loadDashboard();
   if(name==='players')   loadPlayers();
+  if(name==='settings')  loadSettings();
   if(name==='poker'){
     loadPoker();
     if(!S.pokerInterval) S.pokerInterval=setInterval(loadPoker,3000);
@@ -742,7 +836,14 @@ function renderPlayers(list){
   const tbody=$('players-tbody'), empty=$('players-empty');
   if(!list.length){tbody.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
-  tbody.innerHTML=list.map(p=>`
+  const streakMeta = {
+    normal: {icon:'🎲', cls:'btn-ghost',   label:'Normaali'},
+    win:    {icon:'🏆', cls:'btn-green',   label:'Voittoputki'},
+    lose:   {icon:'💸', cls:'btn-red',     label:'Häviöputki'},
+  };
+  tbody.innerHTML=list.map(p=>{
+    const sm = streakMeta[p.streak_mode||'normal'] || streakMeta.normal;
+    return `
     <tr>
       <td><span class="bold">${esc(p.name)}</span></td>
       <td>${vipBadge(p.vip_level)}</td>
@@ -750,6 +851,12 @@ function renderPlayers(list){
       <td class="text-muted text-sm col-hide-sm">${esc(p.phone||'—')}</td>
       <td class="${p.net_balance<=0?'c-green':'c-red'} bold">€${Math.abs(p.net_balance).toFixed(2)}</td>
       <td class="c-green text-sm col-hide-sm">€${(p.total_lost||0).toFixed(2)}</td>
+      <td>
+        <button class="btn btn-purple btn-sm" title="Pisteet: ${p.points||0}" onclick="openGrantPointsModal(${p.id},'${esc(p.name)}',${p.points||0})">🪙 ${p.points||0}</button>
+      </td>
+      <td>
+        <button class="btn ${sm.cls} btn-sm" title="${sm.label} — klikkaa vaihtaaksesi" onclick="cycleStreak(${p.id},'${p.streak_mode||'normal'}')">${sm.icon} ${sm.label}</button>
+      </td>
       <td class="text-muted text-sm col-hide-sm">${p.tx_count}</td>
       <td>
         <div class="flex flex-wrap" style="gap:.3rem">
@@ -760,7 +867,8 @@ function renderPlayers(list){
           <button class="btn btn-red btn-sm" onclick="deletePlayer(${p.id},'${esc(p.name)}')">✕</button>
         </div>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 function openAddModal(){
   $('modal-player-title').textContent='Lisää pelaaja';
@@ -941,10 +1049,13 @@ async function doGrantSpins(){
 }
 
 // ── Card renderer ──────────────────────────────────────────────────────────
-function renderCard(card,size='md'){
+function renderCard(card, size='md', animDelayMs=-1){
   if(!card||!card.rank) return `<div class="card back ${size}"></div>`;
-  const red=card.suit==='♥'||card.suit==='♦';
-  return `<div class="card ${red?'red':'black'} ${size}">
+  const red = card.suit==='♥'||card.suit==='♦';
+  const anim = animDelayMs >= 0
+    ? ` style="animation:flipIn .45s ${animDelayMs}ms ease both"`
+    : '';
+  return `<div class="card ${red?'red':'black'} ${size}"${anim}>
     <div class="corner tl"><div class="crank">${card.rank}</div><div class="csuit">${card.suit}</div></div>
     <div class="center">${card.suit}</div>
     <div class="corner br"><div class="crank">${card.rank}</div><div class="csuit">${card.suit}</div></div>
@@ -952,6 +1063,8 @@ function renderCard(card,size='md'){
 }
 function renderEmpty(size='md'){return `<div class="card empty ${size}"></div>`;}
 function renderBack(size='md'){return `<div class="card back ${size}"></div>`;}
+
+let prevCommCount = 0;
 
 // ── Poker table ────────────────────────────────────────────────────────────
 const STAGES=['waiting','preflop','flop','turn','river','showdown'];
@@ -987,13 +1100,19 @@ function renderPoker(d){
   $('poker-btns').innerHTML=btns;
 
   const comm=d.community_cards||[];
+  // Reset animation counter when hand resets to waiting
+  if(!d.status||d.status==='none'||d.status==='waiting'||stage==='waiting') prevCommCount=0;
   let ch='';
   if(comm.length>0){
-    for(let i=0;i<comm.length;i++) ch+=renderCard(comm[i],'md');
+    for(let i=0;i<comm.length;i++){
+      const delay = i >= prevCommCount ? (i - prevCommCount) * 420 : -1;
+      ch+=renderCard(comm[i],'md',delay);
+    }
     for(let i=comm.length;i<5;i++) ch+=renderEmpty('md');
   } else if(stage!=='waiting'&&d.status!=='none'&&d.status)
     for(let i=0;i<5;i++) ch+=renderEmpty('md');
   $('community-cards-display').innerHTML=ch||`<span style="opacity:.4;font-size:.8rem">Kortit ilmestyvät tähän</span>`;
+  prevCommCount=comm.length;
 
   const seats=(d.seats||[]).filter(s=>s.active);
   $('seat-count').textContent=seats.length?`${seats.length} pelaaja${seats.length!==1?'a':''} pöydässä`:'';
@@ -1070,11 +1189,31 @@ const ALL_CARDS=[];
 function openPresetModal(){
   if(!S.poker||!S.poker.seats)return;
   S.presets=JSON.parse(JSON.stringify(S.poker.preset_hands||{}));
+  if(!S.presets.community) S.presets.community=[null,null,null,null,null];
   S.activePick=null;
   renderPresetModal();
   openModal('modal-preset');
 }
+
+function renderCommSlot(idx){
+  const card=(S.presets.community||[])[idx];
+  const isActive=S.activePick==='c'+idx;
+  if(card){
+    const red=card.suit==='♥'||card.suit==='♦';
+    return `<div style="position:relative;cursor:pointer" onclick="selectCommSlot(${idx})">
+      ${renderCard(card,'sm')}
+      <button onclick="clearCommSlot(event,${idx})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--red2);border:none;color:#fff;font-size:.65rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`;
+  }
+  return `<div class="comm-slot ${isActive?'active':''}" onclick="selectCommSlot(${idx})">${idx+1}</div>`;
+}
+
 function renderPresetModal(){
+  const comm=S.presets.community||[null,null,null,null,null];
+  $('comm-flop-slots').innerHTML=[0,1,2].map(i=>renderCommSlot(i)).join('');
+  $('comm-turn-slot').innerHTML=renderCommSlot(3);
+  $('comm-river-slot').innerHTML=renderCommSlot(4);
+
   const seats=(S.poker.seats||[]).filter(s=>s.active);
   $('preset-seats-list').innerHTML=seats.map(s=>{
     const cards=S.presets[s.id]||[];
@@ -1091,7 +1230,13 @@ function renderPresetModal(){
       </div>`;
   }).join('');
 
-  const usedKeys=new Set(Object.values(S.presets).flat().map(c=>c.rank+'|'+c.suit));
+  const usedKeys=new Set([
+    ...Object.entries(S.presets)
+      .filter(([k])=>k!=='community')
+      .flatMap(([,cards])=>cards||[])
+      .map(c=>c.rank+'|'+c.suit),
+    ...(S.presets.community||[]).filter(Boolean).map(c=>c.rank+'|'+c.suit),
+  ]);
   $('card-picker-grid').innerHTML=ALL_CARDS.map(c=>{
     const red=c.suit==='♥'||c.suit==='♦';
     const key=c.rank+'|'+c.suit;
@@ -1101,29 +1246,124 @@ function renderPresetModal(){
     </div>`;
   }).join('');
 
-  $('active-preset-seat').textContent=S.activePick
-    ?`Valittu paikka: ${(S.poker.seats||[]).find(s=>s.id===S.activePick)?.player_name||S.activePick}`
-    :'Valitse ensin paikka yllä.';
+  let activeLabel='Valitse paikka tai yhteiskorttislotti yllä.';
+  if(typeof S.activePick==='number')
+    activeLabel=`Valittu pelaaja: ${(S.poker.seats||[]).find(s=>s.id===S.activePick)?.player_name||S.activePick}`;
+  else if(typeof S.activePick==='string'&&S.activePick.startsWith('c')){
+    const labels=['Flop 1','Flop 2','Flop 3','Turn','River'];
+    activeLabel=`Valittu yhteiskortti: ${labels[+S.activePick[1]]}`;
+  }
+  $('active-preset-seat').textContent=activeLabel;
 }
+
 function selectPresetSeat(id){S.activePick=id;renderPresetModal();}
-function pickCard(card){
-  if(!S.activePick){toast('Valitse ensin paikka.','error');return;}
-  const existing=S.presets[S.activePick]||[];
-  if(existing.length>=2){toast('Paikalla on jo 2 korttia. Tyhjennä ensin.','error');return;}
-  S.presets[S.activePick]=[...existing,card];
-  if((S.presets[S.activePick]||[]).length>=2) S.activePick=null;
+function selectCommSlot(idx){S.activePick='c'+idx;renderPresetModal();}
+function clearCommSlot(e,idx){
+  e.stopPropagation();
+  if(S.presets.community) S.presets.community[idx]=null;
+  if(S.activePick==='c'+idx) S.activePick=null;
   renderPresetModal();
 }
+
+function pickCard(card){
+  if(S.activePick===null||S.activePick===undefined){toast('Valitse ensin paikka.','error');return;}
+  if(typeof S.activePick==='string'&&S.activePick.startsWith('c')){
+    const idx=+S.activePick[1];
+    if(!S.presets.community) S.presets.community=[null,null,null,null,null];
+    S.presets.community[idx]=card;
+    // Auto-advance to next empty community slot
+    const next=[0,1,2,3,4].find(i=>i>idx&&!S.presets.community[i]);
+    S.activePick=next!=null?'c'+next:null;
+  } else {
+    const existing=S.presets[S.activePick]||[];
+    if(existing.length>=2){toast('Paikalla on jo 2 korttia. Tyhjennä ensin.','error');return;}
+    S.presets[S.activePick]=[...existing,card];
+    if((S.presets[S.activePick]||[]).length>=2) S.activePick=null;
+  }
+  renderPresetModal();
+}
+
 function clearSeatPreset(id){delete S.presets[id];renderPresetModal();}
-function clearPresets(){S.presets={};renderPresetModal();}
+function clearPresets(){
+  const comm=S.presets.community;
+  S.presets={community:comm||[null,null,null,null,null]};
+  renderPresetModal();
+}
 async function savePresets(){
   const payload={};
-  Object.entries(S.presets).forEach(([id,cards])=>{if(cards.length===2)payload[id]=cards;});
+  Object.entries(S.presets).forEach(([id,cards])=>{
+    if(id==='community'){
+      const filled=cards.filter(Boolean);
+      if(filled.length) payload['community']=cards;
+    } else if(Array.isArray(cards)&&cards.length===2){
+      payload[id]=cards;
+    }
+  });
   try{
     await api('POST','/api/poker/preset',payload);
     toast('Ennalta asetetut kädet tallennettu.','success');
     closeModal('modal-preset');loadPoker();
   }catch(e){toast(e.message,'error');}
+}
+
+// ── Streak mode ────────────────────────────────────────────────────────────
+const STREAK_CYCLE = {normal:'win', win:'lose', lose:'normal'};
+async function cycleStreak(pid, current){
+  const next = STREAK_CYCLE[current] || 'normal';
+  try{
+    await api('POST',`/api/players/${pid}/streak`,{mode:next});
+    const labels = {normal:'Normaali 🎲', win:'Voittoputki 🏆', lose:'Häviöputki 💸'};
+    toast(`Putki vaihdettu: ${labels[next]}`,'success');
+    loadPlayers();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ── Grant points ────────────────────────────────────────────────────────────
+function openGrantPointsModal(pid, name, currentPts){
+  S.grantPointsPlayerId = pid;
+  $('grant-pts-player-label').textContent = `Pelaaja: ${name}`;
+  $('grant-pts-current').textContent = currentPts || 0;
+  $('grant-pts-count').value = '';
+  $('grant-pts-reason').value = '';
+  openModal('modal-grant-points');
+  setTimeout(()=>$('grant-pts-count').focus(),50);
+}
+async function doGrantPoints(){
+  const pid   = S.grantPointsPlayerId;
+  const count = parseInt($('grant-pts-count').value, 10);
+  const reason= $('grant-pts-reason').value.trim();
+  if(!pid){ toast('Ei valittua pelaajaa.','error'); return; }
+  if(!Number.isFinite(count)||count===0){ toast('Syötä määrä (ei 0).','error'); return; }
+  try{
+    const r = await api('POST',`/api/players/${pid}/points/grant`,{count,reason:reason||undefined});
+    closeModal('modal-grant-points');
+    const verb = count > 0 ? 'Lisätty' : 'Vähennetty';
+    toast(`${verb} ${Math.abs(count)} pistettä · saldo ${r.points}`,'success');
+    loadPlayers();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ── System settings ─────────────────────────────────────────────────────────
+async function loadSettings(){
+  try{
+    const d = await api('GET','/api/settings');
+    $('s-ppu').value = d.points_per_eur || 10;
+    $('s-min').value = d.min_redeem_pts || 500;
+    $('s-max').value = d.max_redeem_pts || 5000;
+    $('s-exp').value = d.point_expiry_days || 365;
+  }catch(e){ toast(e.message,'error'); }
+}
+async function saveSettings(){
+  const body = {
+    points_per_eur:    $('s-ppu').value,
+    min_redeem_pts:    $('s-min').value,
+    max_redeem_pts:    $('s-max').value,
+    point_expiry_days: $('s-exp').value,
+  };
+  try{
+    await api('PUT','/api/settings',body);
+    toast('Asetukset tallennettu.','success');
+  }catch(e){ toast(e.message,'error'); }
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────

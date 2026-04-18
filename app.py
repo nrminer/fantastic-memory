@@ -110,6 +110,24 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (player_id) REFERENCES players(id)
         )""",
+        "ALTER TABLE players ADD COLUMN streak_mode TEXT DEFAULT 'normal'",
+        """CREATE TABLE IF NOT EXISTS system_settings (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )""",
+        """CREATE TABLE IF NOT EXISTS pikapokeri_games (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_id   INTEGER NOT NULL,
+            bet         INTEGER NOT NULL,
+            deck_json   TEXT NOT NULL,
+            hand_json   TEXT NOT NULL,
+            status      TEXT DEFAULT 'deal',
+            payout      INTEGER DEFAULT 0,
+            result_rank INTEGER DEFAULT -1,
+            result_name TEXT DEFAULT '',
+            created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (player_id) REFERENCES players(id)
+        )""",
     ]
     for m in migrations:
         try:
@@ -214,6 +232,24 @@ def poker_join_page():
 def customer_page():
     return render_template('customer.html', local_ip=get_local_ip())
 
+@app.route('/manifest.json')
+def pwa_manifest():
+    from flask import Response
+    manifest = {
+        "name": "Kasino",
+        "short_name": "Kasino",
+        "start_url": "/asiakas",
+        "display": "standalone",
+        "background_color": "#0a1a10",
+        "theme_color": "#0a1a10",
+        "orientation": "portrait",
+        "icons": [
+            {"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230a1a10'/><text y='.9em' font-size='80' x='10'>♠</text></svg>",
+             "sizes": "any", "type": "image/svg+xml"}
+        ]
+    }
+    return Response(json.dumps(manifest), mimetype='application/manifest+json')
+
 # ─── Players API ─────────────────────────────────────────────────────────────
 
 @app.route('/api/players', methods=['GET'])
@@ -236,9 +272,10 @@ def list_players():
     for p in players:
         has_pw = bool(p.get('password_hash', ''))
         p.pop('password_hash', None)
-        p['has_password'] = has_pw
+        p['has_password']    = has_pw
         p['spins_remaining'] = p.get('spins_remaining') or 0
         p['points']          = p.get('points') or 0
+        p['streak_mode']     = p.get('streak_mode') or 'normal'
     if q:
         players = [p for p in players if q in p['name'].lower()
                    or q in (p['email'] or '').lower()
@@ -546,7 +583,7 @@ def poker_deal():
     if not seats:
         return jsonify({'error': 'Ei pelaajia pöydässä.'}), 400
 
-    used = {(c['rank'], c['suit']) for cards in presets.values() for c in cards}
+    used = {(c['rank'], c['suit']) for cards in presets.values() for c in cards if isinstance(cards, list)}
     deck = [c for c in deck if (c['rank'], c['suit']) not in used]
     if len(deck) < len(seats) * 2 + 5:
         full = new_deck()
@@ -561,9 +598,12 @@ def poker_deal():
         db.execute('UPDATE poker_seats SET hole_cards_json=?,folded=0 WHERE id=?',
                    (json.dumps(cards), seat['id']))
 
+    # Preserve community presets across deal; clear only player hole-card presets
+    comm_preset = presets.get('community', [])
+    new_presets = {'community': comm_preset} if comm_preset else {}
     db.execute(
         'UPDATE poker_sessions SET deck_json=?,stage=?,status=?,community_cards_json=?,preset_hands_json=? WHERE id=?',
-        (json.dumps(deck), 'preflop', 'active', '[]', '{}', sess['id'])
+        (json.dumps(deck), 'preflop', 'active', '[]', json.dumps(new_presets), sess['id'])
     )
     db.commit()
     return jsonify({'ok': True, 'stage': 'preflop'})
@@ -589,12 +629,18 @@ def poker_advance():
     deck      = json.loads(sess['deck_json'])
     community = json.loads(sess['community_cards_json'])
     stage     = sess['stage']
+    comm_pre  = json.loads(sess.get('preset_hands_json') or '{}').get('community', [])
+    def _cc(idx):
+        """Return preset community card at index, or pop from deck."""
+        if idx < len(comm_pre) and comm_pre[idx]:
+            return comm_pre[idx]
+        return deck.pop()
     if stage == 'preflop':
-        community = [deck.pop(), deck.pop(), deck.pop()]; new_stage = 'flop'
+        community = [_cc(0), _cc(1), _cc(2)]; new_stage = 'flop'
     elif stage == 'flop':
-        community.append(deck.pop()); new_stage = 'turn'
+        community.append(_cc(3)); new_stage = 'turn'
     elif stage == 'turn':
-        community.append(deck.pop()); new_stage = 'river'
+        community.append(_cc(4)); new_stage = 'river'
     elif stage == 'river':
         new_stage = 'showdown'
     else:
@@ -766,6 +812,43 @@ PRIZE_BY_ID = {p['id']: p for p in PRIZES_CATALOG}
 # Mini-game constraints
 MIN_BET, MAX_BET = 10, 10000
 
+# Pikapokeri (Jacks-or-Better video poker) payout multipliers
+PIKAPOKERI_PAYOUTS = {9: 800, 8: 50, 7: 25, 6: 9, 5: 6, 4: 4, 3: 3, 2: 2, 1: 1}
+PIKAPOKERI_NAMES   = {
+    9: 'Royal Flush', 8: 'Värisuora', 7: 'Nelikko',
+    6: 'Full House',  5: 'Väri',      4: 'Suora',
+    3: 'Kolmikko',    2: 'Kaksi paria', 1: 'Pari (J tai parempi)', -1: 'Häviö',
+}
+
+# Default system settings
+SETTINGS_DEFAULTS = {
+    'points_per_eur':   '10',   # 100 pts = €10
+    'min_redeem_pts':   '500',
+    'max_redeem_pts':   '5000',
+    'point_expiry_days':'365',
+}
+
+def _get_streak_mode(db, pid):
+    row = db.execute('SELECT streak_mode FROM players WHERE id=?', (pid,)).fetchone()
+    if not row: return 'normal'
+    return row['streak_mode'] or 'normal'
+
+def _get_setting(db, key):
+    row = db.execute('SELECT value FROM system_settings WHERE key=?', (key,)).fetchone()
+    return row['value'] if row else SETTINGS_DEFAULTS.get(key, '')
+
+def _pikapokeri_eval(cards):
+    """Returns (rank, multiplier, name). rank=-1 = losing hand."""
+    rank, tiebreakers = _eval5(cards)
+    if rank == 0:
+        return -1, 0, 'Häviö'
+    if rank == 1:
+        if tiebreakers[0] < 11:
+            return -1, 0, 'Häviö'
+        return 1, 1, 'Pari (J tai parempi)'
+    mult = PIKAPOKERI_PAYOUTS.get(rank, 0)
+    return rank, mult, PIKAPOKERI_NAMES.get(rank, 'Häviö')
+
 def _log_points(db, pid, delta, reason):
     db.execute('INSERT INTO point_transactions(player_id,delta,reason) VALUES(?,?,?)',
                (pid, int(delta), reason))
@@ -894,19 +977,23 @@ def game_coinflip(pid):
     bet, err = _get_bet(d, pid, db)
     if err: return err
     _atomic_deduct_points(db, pid, bet, f'Kolikonheitto panos ({choice})')
-    # 48% player-favourable (house edge 4%)
-    result = 'heads' if random.random() < 0.50 else 'tails'
-    if choice == result:
-        won_flag = random.random() < 0.96  # tiny house edge on winning flips
-        if won_flag:
+    streak = _get_streak_mode(db, pid)
+    if streak == 'win':
+        result  = choice
+        payout  = bet * 2
+        _add_points(db, pid, payout, f'Kolikonheitto voitto ({result})')
+        outcome = 'win'
+    elif streak == 'lose':
+        result  = 'tails' if choice == 'heads' else 'heads'
+        outcome, payout = 'loss', 0
+    else:
+        result = 'heads' if random.random() < 0.50 else 'tails'
+        if choice == result and random.random() < 0.96:
             payout  = bet * 2
             _add_points(db, pid, payout, f'Kolikonheitto voitto ({result})')
             outcome = 'win'
         else:
-            outcome = 'loss'
-            payout  = 0
-    else:
-        outcome, payout = 'loss', 0
+            outcome, payout = 'loss', 0
     db.commit()
     bal = db.execute('SELECT points FROM players WHERE id=?', (pid,)).fetchone()['points'] or 0
     return jsonify({
@@ -924,7 +1011,13 @@ def game_war(pid):
     deck = new_deck()
     pc, dc = deck.pop(), deck.pop()
     pv, dv = _RV[pc['rank']], _RV[dc['rank']]
-    if pv > dv:
+    streak = _get_streak_mode(db, pid)
+    if streak == 'win':
+        outcome = 'win';  payout = bet * 2
+        _add_points(db, pid, payout, 'Sota-peli voitto')
+    elif streak == 'lose':
+        outcome = 'loss'; payout = 0
+    elif pv > dv:
         outcome = 'win';  payout = bet * 2
         _add_points(db, pid, payout, 'Sota-peli voitto')
     elif pv < dv:
@@ -981,6 +1074,14 @@ def game_baccarat(pid):
     if   ptot > btot: winner = 'player'
     elif btot > ptot: winner = 'banker'
     else:             winner = 'tie'
+    # Streak override (cards still shown, only outcome changes)
+    streak = _get_streak_mode(db, pid)
+    if streak == 'win':
+        winner = side
+    elif streak == 'lose':
+        if   side == 'player': winner = 'banker'
+        elif side == 'banker': winner = 'player'
+        else:                  winner = 'player'  # tie bet → any non-tie
     # Payouts: player 1:1, banker 0.95:1, tie 8:1. Losers on non-tie bet if winner=tie? Classic rule: tie is a push for player/banker bets.
     payout = 0
     if side == winner:
@@ -1031,8 +1132,9 @@ def game_bj_start(pid):
     pc     = [deck.pop(), deck.pop()]
     dc     = [deck.pop(), deck.pop()]
     status = 'active'
-    # Natural blackjack
-    if _hand_total(pc) == 21:
+    streak = _get_streak_mode(db, pid)
+    # Natural blackjack — suppress on lose streak
+    if _hand_total(pc) == 21 and streak != 'lose':
         status = 'done_blackjack'
         payout = bet + int(bet * 1.5)  # 3:2
         _add_points(db, pid, payout, 'Blackjack luonnollinen 21')
@@ -1112,6 +1214,13 @@ def game_bj_action(gid):
     else:
         return jsonify({'error': 'Virheellinen toiminto.'}), 400
 
+    # Apply streak override when game ends
+    if outcome is not None:
+        streak = _get_streak_mode(db, pid)
+        if streak == 'lose' and outcome in ('win', 'push'):
+            outcome = 'loss'; status = 'done_loss'; payout = 0
+        elif streak == 'win' and outcome in ('loss', 'bust'):
+            outcome = 'win'; status = 'done_win'; payout = bet * 2
     if payout > 0:
         _add_points(db, pid, payout, f'Blackjack {outcome}')
     db.execute(
@@ -1129,6 +1238,134 @@ def game_bj_action(gid):
         state['payout']  = payout
         state['net']     = payout - bet  # bet is doubled if they doubled
     return jsonify(state)
+
+# ─── Streak mode (admin) ─────────────────────────────────────────────────────
+
+@app.route('/api/players/<int:pid>/streak', methods=['POST'])
+def set_streak_mode(pid):
+    d    = request.json or {}
+    mode = d.get('mode', 'normal')
+    if mode not in ('normal', 'win', 'lose'):
+        return jsonify({'error': 'Virheellinen tila.'}), 400
+    db = get_db()
+    if not db.execute('SELECT id FROM players WHERE id=?', (pid,)).fetchone():
+        return jsonify({'error': 'Pelaajaa ei löydy.'}), 404
+    db.execute('UPDATE players SET streak_mode=? WHERE id=?', (mode, pid))
+    db.commit()
+    return jsonify({'ok': True, 'streak_mode': mode})
+
+# ─── System settings (admin) ─────────────────────────────────────────────────
+
+@app.route('/api/settings', methods=['GET'])
+def get_settings():
+    db   = get_db()
+    rows = db.execute('SELECT key, value FROM system_settings').fetchall()
+    out  = dict(SETTINGS_DEFAULTS)
+    for r in rows:
+        out[r['key']] = r['value']
+    return jsonify(out)
+
+@app.route('/api/settings', methods=['PUT'])
+def update_settings():
+    d  = request.json or {}
+    db = get_db()
+    for key, val in d.items():
+        if key in SETTINGS_DEFAULTS:
+            db.execute('INSERT OR REPLACE INTO system_settings(key,value) VALUES(?,?)',
+                       (key, str(val)))
+    db.commit()
+    return jsonify({'ok': True})
+
+# ─── Cash redemption (points → EUR bonus) ────────────────────────────────────
+
+@app.route('/api/players/<int:pid>/points/cash-redeem', methods=['POST'])
+def cash_redeem(pid):
+    d  = request.json or {}
+    db = get_db()
+    try:
+        pts = int(d.get('points', 0))
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Virheellinen pisteiden määrä.'}), 400
+    min_pts = int(_get_setting(db, 'min_redeem_pts'))
+    max_pts = int(_get_setting(db, 'max_redeem_pts'))
+    ppu     = float(_get_setting(db, 'points_per_eur'))   # points per €1
+    if pts < min_pts:
+        return jsonify({'error': f'Vähimmäislunastus on {min_pts} pistettä.'}), 400
+    if pts > max_pts:
+        return jsonify({'error': f'Enimmäislunastus on {max_pts} pistettä kerrallaan.'}), 400
+    eur     = round(pts / ppu, 2)
+    new_bal = _atomic_deduct_points(db, pid, pts, f'Käteisnosto: {pts} p → €{eur:.2f}')
+    if new_bal is None:
+        return jsonify({'error': 'Ei tarpeeksi pisteitä.'}), 400
+    db.execute(
+        'INSERT INTO bonuses(player_id,label,amount,seen) VALUES(?,?,?,?)',
+        (pid, f'Pisteistä lunastettu: {pts} pistettä', float(eur), 0)
+    )
+    db.commit()
+    return jsonify({'ok': True, 'points': new_bal, 'eur': eur, 'pts_redeemed': pts})
+
+# ─── Pikapokeri (Jacks-or-Better video poker) ─────────────────────────────────
+
+@app.route('/api/points/<int:pid>/pikapokeri/start', methods=['POST'])
+def pikapokeri_start(pid):
+    d  = request.json or {}
+    db = get_db()
+    db.execute("UPDATE pikapokeri_games SET status='abandoned' WHERE player_id=? AND status='deal'", (pid,))
+    bet, err = _get_bet(d, pid, db)
+    if err: return err
+    _atomic_deduct_points(db, pid, bet, 'Pikapokeri panos')
+    deck = new_deck()
+    hand = [deck.pop() for _ in range(5)]
+    cur  = db.execute(
+        'INSERT INTO pikapokeri_games(player_id,bet,deck_json,hand_json,status) VALUES(?,?,?,?,?)',
+        (pid, bet, json.dumps(deck), json.dumps(hand), 'deal')
+    )
+    gid = cur.lastrowid
+    db.commit()
+    bal = db.execute('SELECT points FROM players WHERE id=?', (pid,)).fetchone()['points'] or 0
+    return jsonify({'game_id': gid, 'hand': hand, 'bet': bet, 'status': 'deal', 'points': bal})
+
+@app.route('/api/points/pikapokeri/<int:gid>/draw', methods=['POST'])
+def pikapokeri_draw(gid):
+    d    = request.json or {}
+    hold = [int(i) for i in d.get('hold', []) if str(i).isdigit()]
+    db   = get_db()
+    game = db.execute('SELECT * FROM pikapokeri_games WHERE id=?', (gid,)).fetchone()
+    if not game:
+        return jsonify({'error': 'Peliä ei löydy.'}), 404
+    if game['status'] != 'deal':
+        return jsonify({'error': 'Peli on jo päättynyt.'}), 400
+    pid  = game['player_id']
+    bet  = game['bet']
+    deck = json.loads(game['deck_json'])
+    hand = json.loads(game['hand_json'])
+
+    new_hand = [hand[i] if i in hold else deck.pop() for i in range(5)]
+
+    rank, mult, result_name = _pikapokeri_eval(new_hand)
+
+    streak = _get_streak_mode(db, pid)
+    if streak == 'lose' and mult > 0:
+        rank, mult, result_name = -1, 0, 'Häviö'
+    elif streak == 'win' and mult == 0:
+        rank, mult, result_name = 3, 3, 'Kolmikko'
+
+    payout = bet * mult
+    if payout > 0:
+        _add_points(db, pid, payout, f'Pikapokeri voitto ({result_name})')
+
+    db.execute(
+        'UPDATE pikapokeri_games SET hand_json=?,deck_json=?,status=?,payout=?,result_rank=?,result_name=? WHERE id=?',
+        (json.dumps(new_hand), json.dumps(deck), 'done', payout, rank, result_name, gid)
+    )
+    db.commit()
+    bal     = db.execute('SELECT points FROM players WHERE id=?', (pid,)).fetchone()['points'] or 0
+    outcome = 'win' if payout > 0 else 'loss'
+    return jsonify({
+        'hand': new_hand, 'rank': rank, 'result_name': result_name,
+        'mult': mult, 'bet': bet, 'payout': payout, 'net': payout - bet,
+        'outcome': outcome, 'points': bal,
+    })
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
