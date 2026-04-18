@@ -519,6 +519,16 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
             <div class="mini-cards" id="bj-player-cards"></div>
             <div style="text-align:center;font-size:.9rem;font-weight:700;color:var(--gold2)" id="bj-player-total"></div>
           </div>
+          <div id="bj-insurance-area" style="display:none;margin-bottom:.6rem">
+            <div style="background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.3);border-radius:8px;padding:.75rem;margin-bottom:.5rem;font-size:.85rem;text-align:center">
+              🛡 Jakajalla on ässä. Haluatko ottaa vakuutuksen?<br>
+              <span style="color:var(--muted);font-size:.78rem" id="bj-ins-cost"></span>
+            </div>
+            <div class="bj-actions">
+              <button id="bj-ins-take" onclick="doBlackjackAction('insurance')" style="border-color:rgba(201,168,76,.5);color:var(--gold)">🛡 Vakuutus</button>
+              <button id="bj-ins-decline" onclick="declineInsurance()">✗ Ei vakuutusta</button>
+            </div>
+          </div>
           <div class="bj-actions">
             <button id="bj-hit" onclick="doBlackjackAction('hit')">🃏 Ota kortti</button>
             <button id="bj-stand" onclick="doBlackjackAction('stand')">🛑 Jää</button>
@@ -612,6 +622,7 @@ let pollId       = null;
 let wheelRot     = 0;
 let spinning     = false;
 let allTransactions = [];
+let prevCommCount = 0;
 
 // Notification state
 let knownBonusIds = new Set(JSON.parse(localStorage.getItem('known_bonus_ids')||'[]'));
@@ -971,6 +982,11 @@ async function joinPokerGame(){
 
 function renderPlayerState(d){
   if(!d||d.error)return;
+  if(!d.active){
+    $('card-section').style.display='none';
+    token=null; localStorage.removeItem('cust_poker_token');
+    prevCommCount=0; return;
+  }
   $('card-section').style.display='flex';
   showingCards=d.show_cards;
   updateShowBtn();
@@ -979,17 +995,23 @@ function renderPlayerState(d){
     hEl.innerHTML=renderCard(d.hole_cards[0],'xl')+renderCard(d.hole_cards[1],'xl');
   else
     hEl.innerHTML='<div class="card back xl"></div><div class="card back xl"></div>';
+  // Reset community card count on new hand (waiting/no community)
   const comm=d.community_cards||[];
+  if(!d.status||d.stage==='waiting') prevCommCount=0;
   const cEl=$('community-display');
   if(comm.length>0){
     let h='';
-    for(let i=0;i<comm.length;i++) h+=renderCard(comm[i],'md');
+    for(let i=0;i<comm.length;i++){
+      const delay = i>=prevCommCount ? (i-prevCommCount)*420 : -1;
+      h+=renderCard(comm[i],'md',delay);
+    }
     for(let i=comm.length;i<5;i++) h+=renderEmptyCard('md');
     cEl.innerHTML=h;
+    prevCommCount=comm.length;
   } else {
+    prevCommCount=0;
     cEl.innerHTML='<span style="color:rgba(255,255,255,.3);font-size:.8rem">Odotetaan floppia…</span>';
   }
-  if(!d.active){$('card-section').style.display='none';token=null;localStorage.removeItem('cust_poker_token');}
 }
 
 // ── Show/hide cards ────────────────────────────────────────────────────────
@@ -1009,10 +1031,11 @@ async function toggleShowCards(){
 }
 
 // ── Card rendering ─────────────────────────────────────────────────────────
-function renderCard(card,size='xl'){
-  if(!card||!card.rank)return`<div class="card back ${size}"></div>`;
-  const red=card.suit==='♥'||card.suit==='♦';
-  return`<div class="card ${red?'red':'black'} ${size}">
+function renderCard(card, size='xl', delayMs=-1){
+  if(!card||!card.rank) return `<div class="card back ${size}"></div>`;
+  const red = card.suit==='♥'||card.suit==='♦';
+  const anim = delayMs >= 0 ? ` style="animation:flipIn .45s ${delayMs}ms ease both"` : '';
+  return `<div class="card ${red?'red':'black'} ${size}"${anim}>
     <div class="corner tl">${card.rank}<br>${card.suit}</div>
     <div class="center">${card.suit}</div>
     <div class="corner br">${card.rank}<br>${card.suit}</div>
@@ -1295,11 +1318,13 @@ async function doBaccarat(){
 let bjGameId = null;
 let prevBjPlayerCount = 0;
 let prevBjActive = null; // null=no game, true=in-progress, false=finished
+let bjInsuranceDeclined = false;
 
 function bjReset(){
-  bjGameId=null; prevBjPlayerCount=0; prevBjActive=null;
+  bjGameId=null; prevBjPlayerCount=0; prevBjActive=null; bjInsuranceDeclined=false;
   $('bj-start-area').style.display='block';
   $('bj-game-area').style.display='none';
+  $('bj-insurance-area').style.display='none';
   $('bj-result').innerHTML='';
   $('bj-new-btn').style.display='none';
   $('bj-start-btn').disabled=false;
@@ -1326,9 +1351,21 @@ function renderBjState(d, resultHtml=''){
 
   $('bj-player-total').textContent=`Yhteensä: ${d.player_total}`;
   $('bj-dealer-total').textContent=isActive?`Näkyy: ${d.dealer_total}`:`Yhteensä: ${d.dealer_total}`;
-  $('bj-hit').disabled=!isActive;
-  $('bj-stand').disabled=!isActive;
-  $('bj-double').disabled=!isActive;
+
+  // Insurance prompt: show when available and not yet declined
+  const insAvail = d.insurance_available && !bjInsuranceDeclined;
+  $('bj-insurance-area').style.display = insAvail ? 'block' : 'none';
+  if(insAvail){
+    const insCost = Math.max(1, Math.floor(d.bet/2));
+    $('bj-ins-cost').textContent = `Vakuutus maksaa ${insCost} pistettä · Voitto 2:1 jos jakajalla on BJ`;
+  }
+
+  // Disable action buttons while insurance prompt is showing
+  const canAct = isActive && !insAvail;
+  $('bj-hit').disabled=!canAct;
+  $('bj-stand').disabled=!canAct;
+  $('bj-double').disabled=!canAct || pc.length!==2;
+
   if(resultHtml) $('bj-result').innerHTML=resultHtml;
   if(!isActive) $('bj-new-btn').style.display='block';
 
@@ -1364,14 +1401,41 @@ async function doBlackjackStart(){
 
 async function doBlackjackAction(action){
   if(!bjGameId) return;
-  ['bj-hit','bj-stand','bj-double'].forEach(id=>$(id).disabled=true);
+  ['bj-hit','bj-stand','bj-double','bj-ins-take','bj-ins-decline'].forEach(id=>{const el=$(id);if(el)el.disabled=true;});
   try{
     const r=await fetch(`/api/points/blackjack/${bjGameId}/action`,{
       method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})
     });
     const d=await r.json();
-    if(!r.ok){alert(d.error);['bj-hit','bj-stand','bj-double'].forEach(id=>$(id).disabled=false);return;}
+    if(!r.ok){
+      alert(d.error);
+      ['bj-hit','bj-stand','bj-double','bj-ins-take','bj-ins-decline'].forEach(id=>{const el=$(id);if(el)el.disabled=false;});
+      return;
+    }
     player.points=d.points;
+
+    if(action==='insurance'){
+      if(d.insurance_result==='loss'){
+        // Dealer has no BJ: insurance lost, game continues
+        bjInsuranceDeclined=true; // treat as resolved so prompt hides
+        const lostHtml=`<div style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.2);border-radius:8px;padding:.6rem;text-align:center;font-size:.83rem;color:#e74c3c;margin-bottom:.5rem">
+          🛡 Vakuutus hävisi (ei BJ) — ${d.net} pistettä · Peli jatkuu</div>`;
+        renderBjState(d, lostHtml);
+      } else {
+        // Dealer has BJ: insurance wins, main hand settled
+        const ins=d.insurance_amount||0, insPayout=d.insurance_payout||0;
+        const mainLabel=d.outcome==='push'?'🤝 Molemmat BJ — tasapeli':'😞 Jakajalla Blackjack';
+        const cls=d.outcome==='push'?'push':'loss';
+        const resHtml=`<div class="game-result ${cls}">
+          <div style="color:var(--green);font-size:.88rem;margin-bottom:.35rem">🛡 Vakuutus voitti! +${insPayout-ins} p</div>
+          <div class="res-outcome">${mainLabel}</div>
+          <div class="res-pts">${d.net>=0?'+':''}${d.net} pistettä yhteensä</div>
+        </div>`;
+        renderBjState(d, resHtml);
+      }
+      pollPoints(); return;
+    }
+
     let resHtml='';
     if(d.outcome){
       const labels={win:'🏆 Voitit!',push:'🤝 Tasapeli!',loss:'😞 Hävisit',bust:'💥 Ylitit 21!'};
@@ -1384,6 +1448,12 @@ async function doBlackjackAction(action){
     renderBjState(d, resHtml);
     pollPoints();
   }catch(e){alert('Virhe.');}
+}
+
+function declineInsurance(){
+  bjInsuranceDeclined=true;
+  $('bj-insurance-area').style.display='none';
+  ['bj-hit','bj-stand','bj-double'].forEach(id=>$(id).disabled=false);
 }
 
 // ── Pikapokeri ────────────────────────────────────────────────────────────────
