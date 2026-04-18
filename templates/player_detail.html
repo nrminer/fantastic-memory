@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="flex-between" style="margin-bottom:1.5rem">
+  <div>
+    <a href="{{ url_for('index') }}" style="color:#666;text-decoration:none;font-size:0.85rem">← Dashboard</a>
+    <h1 style="margin-top:0.25rem;margin-bottom:0">{{ player.name }}</h1>
+  </div>
+  <div class="flex">
+    <form class="inline" method="POST" action="{{ url_for('reset_player', player_id=player.id) }}"
+          onsubmit="return confirm('Reset all transactions for {{ player.name }}?')">
+      <button class="btn btn-ghost btn-sm">Reset</button>
+    </form>
+    <form class="inline" method="POST" action="{{ url_for('delete_player', player_id=player.id) }}"
+          onsubmit="return confirm('Delete {{ player.name }} permanently?')">
+      <button class="btn btn-red btn-sm">Delete Player</button>
+    </form>
+  </div>
+</div>
+
+<div class="stat-grid">
+  <div class="stat-box">
+    <div class="label">Net Balance</div>
+    <div class="value {% if player.balance > 0 %}profit{% elif player.balance < 0 %}loss{% else %}neutral{% endif %}">
+      {{ "+" if player.balance > 0 else "" }}{{ "%.2f"|format(player.balance) }}€
+    </div>
+  </div>
+  <div class="stat-box">
+    <div class="label">Total Won</div>
+    <div class="value profit">+{{ "%.2f"|format(player.total_profit) }}€</div>
+  </div>
+  <div class="stat-box">
+    <div class="label">Total Lost</div>
+    <div class="value loss">{{ "%.2f"|format(player.total_loss) }}€</div>
+  </div>
+  <div class="stat-box">
+    <div class="label">Transactions</div>
+    <div class="value neutral">{{ transactions|length }}</div>
+  </div>
+</div>
+
+<!-- Add Transaction -->
+<div class="card">
+  <h2>Record Transaction</h2>
+  <form method="POST" action="{{ url_for('add_transaction', player_id=player.id) }}">
+    <div style="display:grid;grid-template-columns:auto 1fr 2fr auto;gap:0.75rem;align-items:end">
+      <div class="form-group" style="margin:0">
+        <label>Type</label>
+        <select name="type">
+          <option value="loss">Loss (house wins)</option>
+          <option value="profit">Profit (player wins)</option>
+        </select>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Amount (€)</label>
+        <input type="number" name="amount" step="0.01" min="0.01" placeholder="0.00" required>
+      </div>
+      <div class="form-group" style="margin:0">
+        <label>Note (optional)</label>
+        <input type="text" name="note" placeholder="e.g. Blackjack round 3">
+      </div>
+      <button type="submit" class="btn btn-gold">Add</button>
+    </div>
+  </form>
+</div>
+
+<!-- Transaction History -->
+<div class="card">
+  <h2>Transaction History</h2>
+  {% if transactions %}
+  <table>
+    <thead>
+      <tr>
+        <th>Date & Time</th>
+        <th>Amount</th>
+        <th>Note</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tx in transactions %}
+      <tr>
+        <td class="neutral" style="font-size:0.85rem">{{ tx.timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td class="{% if tx.amount >= 0 %}profit{% else %}loss{% endif %}">
+          {{ "+" if tx.amount >= 0 else "" }}{{ "%.2f"|format(tx.amount) }}€
+        </td>
+        <td style="color:#aaa">{{ tx.note or '—' }}</td>
+        <td>
+          <form class="inline" method="POST" action="{{ url_for('delete_transaction', tx_id=tx.id) }}"
+                onsubmit="return confirm('Delete this transaction?')">
+            <button class="btn btn-ghost btn-sm">✕</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No transactions yet.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

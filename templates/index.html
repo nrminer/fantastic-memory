@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Kasinon Hallinta</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1f17;--bg2:#112a1d;--bg3:#163524;--bg4:#1c3f2b;
+  --gold:#c9a84c;--gold2:#e8c870;--cream:#f0ead8;
+  --red:#c0392b;--red2:#e74c3c;--green:#27ae60;
+  --muted:#6b9a7a;--border:#1e3d2a;--sidebar:220px;--radius:10px;
+  --topbar:0px;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--cream);display:flex;flex-direction:column;height:100vh;overflow:hidden}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+
+/* ── Top bar (tablet/mobile) ─────────────────────────────────────────────── */
+#topbar{display:none;background:var(--bg2);border-bottom:1px solid var(--border);padding:.65rem 1rem;align-items:center;gap:.75rem;flex-shrink:0;z-index:100}
+#topbar .logo{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--gold);flex:1}
+#hamburger{background:none;border:none;color:var(--cream);font-size:1.4rem;cursor:pointer;padding:.25rem .4rem;line-height:1;border-radius:6px;transition:background .15s}
+#hamburger:hover{background:var(--bg3)}
+#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:149}
+#sidebar-overlay.open{display:block}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+#layout{display:flex;flex:1;overflow:hidden}
+#sidebar{width:var(--sidebar);flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:left .25s;z-index:150}
+.sidebar-brand{padding:1.75rem 1.4rem 1.2rem;border-bottom:1px solid var(--border)}
+.sidebar-brand .logo{font-family:'Playfair Display',serif;font-size:1.25rem;font-weight:700;color:var(--gold);letter-spacing:.04em;display:flex;align-items:center;gap:.5rem}
+.sidebar-brand .tagline{font-size:.7rem;color:var(--muted);margin-top:.3rem;letter-spacing:.1em;text-transform:uppercase}
+nav ul{list-style:none;padding:.75rem 0;flex:1}
+nav ul li{display:flex;align-items:center;gap:.75rem;padding:.85rem 1.4rem;cursor:pointer;font-size:.9rem;font-weight:500;color:var(--muted);border-left:3px solid transparent;transition:all .2s;user-select:none;min-height:48px}
+nav ul li:hover{background:var(--bg3);color:var(--cream)}
+nav ul li.active{color:var(--gold);background:rgba(201,168,76,.08);border-left-color:var(--gold)}
+nav ul li .nav-icon{font-size:1.1rem;width:1.2rem;text-align:center}
+.sidebar-footer{padding:1rem 1.4rem;border-top:1px solid var(--border);font-size:.72rem;color:var(--muted)}
+
+/* ── Main ─────────────────────────────────────────────────────────────────── */
+#main{flex:1;overflow-y:auto;display:flex;flex-direction:column;min-width:0}
+.view{display:none;padding:1.5rem;flex:1}
+.view.active{display:block}
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.5rem}
+.page-header h1{font-family:'Playfair Display',serif;font-size:1.7rem;font-weight:700;color:var(--gold)}
+
+/* ── Stat cards ──────────────────────────────────────────────────────────── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:1.1rem 1.25rem;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--gold),transparent)}
+.stat-card .label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem}
+.stat-card .value{font-size:1.6rem;font-weight:700;line-height:1}
+.stat-card .sub{font-size:.75rem;color:var(--muted);margin-top:.3rem}
+.c-gold{color:var(--gold)}.c-green{color:var(--green)}.c-red{color:var(--red2)}.c-cream{color:var(--cream)}
+
+/* ── Panels ───────────────────────────────────────────────────────────────── */
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1.25rem;overflow:hidden}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:.85rem 1.25rem;border-bottom:1px solid var(--border)}
+.panel-header h3{font-family:'Playfair Display',serif;font-size:1rem;font-weight:600;color:var(--gold)}
+.panel-body{padding:1.1rem}
+
+/* ── Tables ───────────────────────────────────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:.875rem}
+th{text-align:left;padding:.5rem .75rem;color:var(--muted);font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:.6rem .75rem;border-bottom:1px solid rgba(30,61,42,.5);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg3)}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;border-radius:7px;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:.875rem;font-weight:600;text-decoration:none;transition:all .2s;white-space:nowrap;min-height:36px}
+.btn:hover{opacity:.85;transform:translateY(-1px)}.btn:active{transform:translateY(0)}
+.btn-gold{background:var(--gold);color:#0d1f17}
+.btn-red{background:var(--red);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+.btn-sm{padding:.3rem .7rem;font-size:.78rem;border-radius:5px;min-height:30px}
+.btn-outline-gold{background:transparent;border:1px solid var(--gold);color:var(--gold)}
+.btn-green{background:var(--green);color:#fff}
+.btn-purple{background:#7b2d8b;color:#fff}
+.btn-bonus{background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.25);color:var(--gold)}
+.btn-bonus:hover{background:rgba(201,168,76,.22);border-color:var(--gold)}
+
+/* ── Forms ────────────────────────────────────────────────────────────────── */
+.form-group{margin-bottom:1rem}
+.form-group label{display:block;font-size:.8rem;color:var(--muted);margin-bottom:.35rem;font-weight:500}
+.form-group .hint{display:block;font-size:.72rem;color:var(--muted);margin-top:.25rem;opacity:.7}
+.form-control{width:100%;padding:.6rem .9rem;background:var(--bg);border:1px solid var(--border);border-radius:7px;color:var(--cream);font-family:'DM Sans',sans-serif;font-size:.9rem;transition:border-color .2s}
+.form-control:focus{outline:none;border-color:var(--gold)}
+.form-control::placeholder{color:var(--muted)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+select.form-control option{background:var(--bg2)}
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;opacity:0;pointer-events:none;transition:opacity .25s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal-box{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:min(640px,96vw);max-height:92vh;overflow-y:auto;transform:translateY(20px);transition:transform .25s}
+.modal-overlay.open .modal-box{transform:translateY(0)}
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.4rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg2);z-index:1}
+.modal-head h2{font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--gold)}
+.modal-close{background:none;border:none;color:var(--muted);font-size:1.4rem;cursor:pointer;line-height:1;padding:.2rem .4rem}
+.modal-close:hover{color:var(--cream)}
+.modal-body{padding:1.4rem}
+.modal-footer{display:flex;justify-content:flex-end;gap:.75rem;padding:.9rem 1.4rem;border-top:1px solid var(--border)}
+
+/* ── VIP badges ───────────────────────────────────────────────────────────── */
+.vip{display:inline-block;padding:.2rem .55rem;border-radius:4px;font-size:.72rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.vip-Standard{background:rgba(107,154,122,.15);color:#6b9a7a}
+.vip-Silver{background:rgba(192,192,192,.15);color:#c0c0c0}
+.vip-Gold{background:rgba(201,168,76,.18);color:var(--gold)}
+.vip-Whale{background:rgba(138,43,226,.2);color:#bf7fff}
+
+/* ── Search bar ───────────────────────────────────────────────────────────── */
+.search-bar{display:flex;gap:.75rem;margin-bottom:1.1rem;flex-wrap:wrap}
+.search-input-wrap{position:relative;flex:1;min-width:160px}
+.search-input-wrap input{width:100%;padding:.6rem .9rem .6rem 2.4rem}
+.search-icon{position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+
+/* ── Toast ────────────────────────────────────────────────────────────────── */
+#toast-container{position:fixed;bottom:1.5rem;right:1.5rem;display:flex;flex-direction:column;gap:.5rem;z-index:9999}
+.toast{padding:.7rem 1.1rem;border-radius:8px;font-size:.875rem;font-weight:500;animation:slideIn .3s ease;max-width:300px;box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.toast.success{background:#1a3a1a;border:1px solid #2d6a2d;color:#7ec87e}
+.toast.error{background:#3a1a1a;border:1px solid #6a2d2d;color:#c87e7e}
+.toast.info{background:#1a2a3a;border:1px solid #2d4a6a;color:#7eaac8}
+@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── Leaderboard ──────────────────────────────────────────────────────────── */
+.leaderboard-item{display:flex;align-items:center;gap:.75rem;padding:.55rem 0;border-bottom:1px solid rgba(30,61,42,.4)}
+.leaderboard-item:last-child{border-bottom:none}
+.lb-rank{width:1.6rem;height:1.6rem;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--muted);flex-shrink:0}
+.lb-rank.gold{background:rgba(201,168,76,.2);color:var(--gold)}
+.lb-rank.silver{background:rgba(192,192,192,.15);color:#c0c0c0}
+.lb-rank.bronze{background:rgba(205,127,50,.15);color:#cd7f32}
+.lb-name{flex:1;font-weight:500;font-size:.875rem}
+.lb-amount{font-weight:700;font-size:.9rem}
+
+/* ── Feed ─────────────────────────────────────────────────────────────────── */
+.feed-item{display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid rgba(30,61,42,.4);font-size:.82rem}
+.feed-item:last-child{border-bottom:none}
+.feed-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.feed-dot.win{background:var(--green)}.feed-dot.loss{background:var(--red2)}
+
+/* ── Poker ────────────────────────────────────────────────────────────────── */
+.poker-stage-bar{display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.stage-pill{padding:.3rem .85rem;border-radius:20px;font-size:.78rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border:1px solid var(--border);color:var(--muted)}
+.stage-pill.active{background:rgba(201,168,76,.15);border-color:var(--gold);color:var(--gold)}
+.poker-controls{display:flex;gap:.5rem;flex-wrap:wrap}
+.join-url-box{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.join-url-label{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.join-url-text{font-family:monospace;font-size:.9rem;color:var(--gold2);flex:1;word-break:break-all}
+
+/* ── Felt table ───────────────────────────────────────────────────────────── */
+.felt-wrap{display:flex;justify-content:center;margin-bottom:1.5rem}
+.felt-table{background:radial-gradient(ellipse at center,#1a5c2e 0%,#0e3a1b 70%,#092914 100%);border:8px solid #5c3a1e;border-radius:50%;width:min(580px,100%);aspect-ratio:2/1;position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;box-shadow:0 0 60px rgba(0,0,0,.6),inset 0 0 40px rgba(0,0,0,.3)}
+.community-label{font-size:.7rem;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.12em;font-weight:600}
+.community-cards{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+
+/* ── Playing card ─────────────────────────────────────────────────────────── */
+.card{background:white;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.6);display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;position:relative;user-select:none;flex-shrink:0}
+.card.md{width:52px;height:74px;font-size:1rem}.card.lg{width:70px;height:100px;font-size:1.3rem}.card.sm{width:38px;height:54px;font-size:.8rem}
+.card.red{color:#c0392b}.card.black{color:#111}
+.card .crank{font-size:.75em;line-height:1}.card .csuit{font-size:.85em;line-height:1}
+.card .corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1}
+.card .corner.tl{top:4px;left:5px}.card .corner.br{bottom:4px;right:5px;transform:rotate(180deg)}
+.card .center{font-size:1.4em}
+.card.back{background:linear-gradient(135deg,#0e3a1b 25%,#1a5c2e 25%,#1a5c2e 50%,#0e3a1b 50%,#0e3a1b 75%,#1a5c2e 75%);background-size:8px 8px;border:2px solid var(--gold)}
+.card.empty{background:rgba(255,255,255,.05);border:2px dashed rgba(255,255,255,.15)}
+
+/* ── Seats grid ───────────────────────────────────────────────────────────── */
+.seats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1rem}
+.seat-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:1rem;transition:border-color .2s}
+.seat-card.folded{opacity:.5}
+.seat-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem}
+.seat-num{width:1.6rem;height:1.6rem;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:var(--gold);flex-shrink:0}
+.seat-name{font-weight:600;font-size:.9rem;flex:1;margin:0 .5rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.seat-status{font-size:.7rem;color:var(--muted)}
+.seat-status.folded-label{color:var(--red2)}
+.seat-hole-cards{display:flex;gap:.4rem;margin-bottom:.4rem;flex-wrap:wrap;align-items:center}
+.seat-actions{display:flex;gap:.4rem;flex-wrap:wrap}
+.show-indicator{font-size:.68rem;padding:.15rem .4rem;border-radius:3px;font-weight:600}
+.show-indicator.visible{background:rgba(39,174,96,.15);color:var(--green)}
+.show-indicator.hidden{background:rgba(107,154,122,.1);color:var(--muted)}
+
+/* ── Card picker ──────────────────────────────────────────────────────────── */
+.card-picker{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem}
+.cp-card{width:38px;height:54px;border-radius:5px;font-size:.75rem;font-weight:700;cursor:pointer;border:2px solid transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;background:white;transition:all .15s;user-select:none}
+.cp-card:hover{transform:scale(1.08)}
+.cp-card.red{color:#c0392b}.cp-card.black{color:#111}
+.cp-card.selected{border-color:var(--gold);box-shadow:0 0 8px rgba(201,168,76,.6)}
+.cp-card.used{opacity:.25;pointer-events:none}
+.preset-seat-row{display:flex;align-items:center;gap:.75rem;padding:.75rem 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.preset-seat-row:last-child{border-bottom:none}
+.preset-seat-label{font-weight:600;font-size:.85rem;min-width:90px}
+.preset-cards-display{display:flex;gap:.3rem}
+
+/* ── Dash cols ────────────────────────────────────────────────────────────── */
+.dash-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem}
+
+/* ── Hand results ─────────────────────────────────────────────────────────── */
+.hand-results{margin-top:1.5rem}
+.hand-result-item{display:flex;align-items:center;gap:.9rem;padding:.75rem 1rem;border-radius:8px;margin-bottom:.5rem;border:1px solid var(--border);background:var(--bg2)}
+.hand-result-item.winner{border-color:var(--gold);background:rgba(201,168,76,.07)}
+.hand-rank-badge{width:1.8rem;height:1.8rem;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:var(--muted);flex-shrink:0}
+.hand-rank-badge.first{background:rgba(201,168,76,.25);color:var(--gold)}
+.hand-rank-badge.second{background:rgba(192,192,192,.15);color:#c0c0c0}
+.hand-rank-badge.third{background:rgba(205,127,50,.15);color:#cd7f32}
+.hand-name-tag{font-size:.75rem;font-weight:700;padding:.2rem .55rem;border-radius:4px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.hand-name-tag.rank-9,.hand-name-tag.rank-8{background:rgba(155,89,182,.2);color:#bf7fff}
+.hand-name-tag.rank-7{background:rgba(231,76,60,.2);color:#e74c3c}
+.hand-name-tag.rank-6,.hand-name-tag.rank-5{background:rgba(39,174,96,.2);color:#2ecc71}
+.hand-name-tag.rank-4,.hand-name-tag.rank-3{background:rgba(52,152,219,.2);color:#5dade2}
+.hand-name-tag.rank-2,.hand-name-tag.rank-1{background:rgba(241,196,15,.15);color:#f1c40f}
+.hand-name-tag.rank-0{background:var(--bg3);color:var(--muted)}
+
+/* ── Bonus items ──────────────────────────────────────────────────────────── */
+.bonus-item{display:flex;align-items:center;gap:.75rem;padding:.6rem 0;border-bottom:1px solid rgba(30,61,42,.4)}
+.bonus-item:last-child{border-bottom:none}
+.bonus-tag{padding:.2rem .6rem;border-radius:4px;font-size:.75rem;font-weight:700;background:rgba(201,168,76,.12);color:var(--gold);border:1px solid rgba(201,168,76,.2)}
+.bonus-claimed{opacity:.45;text-decoration:line-through}
+
+/* ── Password strength ────────────────────────────────────────────────────── */
+.pw-set-badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.7rem;font-weight:700;background:rgba(39,174,96,.12);color:var(--green);border:1px solid rgba(39,174,96,.2)}
+.pw-none-badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.7rem;background:rgba(107,154,122,.1);color:var(--muted)}
+
+/* ── Misc ─────────────────────────────────────────────────────────────────── */
+.flex{display:flex;align-items:center;gap:.5rem}.flex-wrap{flex-wrap:wrap}
+.flex-1{flex:1}.mb-1{margin-bottom:1rem}.mt-half{margin-top:.5rem}
+.text-muted{color:var(--muted)}.text-sm{font-size:.82rem}.bold{font-weight:700}
+.truncate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.divider{border:none;border-top:1px solid var(--border);margin:1rem 0}
+.empty-state{text-align:center;padding:2.5rem 1rem;color:var(--muted);font-size:.9rem}
+.empty-state .empty-icon{font-size:2.5rem;margin-bottom:.75rem;opacity:.4}
+
+/* ── Responsive: Tablet (≤1024px) ────────────────────────────────────────── */
+@media (max-width:1024px){
+  .view{padding:1.25rem 1rem}
+  .dash-cols{grid-template-columns:1fr 1fr}
+}
+/* ── Responsive: Small tablet / large phone (≤860px) ─────────────────────── */
+@media (max-width:860px){
+  :root{--sidebar:0px}
+  #topbar{display:flex}
+  #sidebar{
+    position:fixed;
+    left:-260px;top:0;bottom:0;
+    width:240px;
+    box-shadow:4px 0 24px rgba(0,0,0,.6);
+  }
+  #sidebar.open{left:0}
+  #layout{flex-direction:column}
+  #main{overflow-y:auto;height:auto;flex:1}
+  .sidebar-brand{display:block}
+  .view{padding:1rem .9rem}
+  .dash-cols{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .seats-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+  /* player table: hide less important columns */
+  .col-hide-sm{display:none}
+  .modal-box{max-height:96vh;border-radius:12px}
+}
+@media (max-width:480px){
+  .stat-grid{grid-template-columns:1fr 1fr}
+  .page-header h1{font-size:1.4rem}
+  #toast-container{right:.75rem;bottom:.75rem;left:.75rem}
+  .toast{max-width:100%}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Top bar (tablet/mobile only) ────────────────────────────────────────── -->
+<div id="topbar">
+  <button id="hamburger" onclick="toggleSidebar()">☰</button>
+  <div class="logo">♠ Kasino</div>
+</div>
+
+<div id="sidebar-overlay" onclick="closeSidebar()"></div>
+
+<div id="layout">
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────────── -->
+<div id="sidebar">
+  <div class="sidebar-brand">
+    <div class="logo"><span>♠</span> Kasino</div>
+    <div class="tagline">Hallintajärjestelmä</div>
+  </div>
+  <nav>
+    <ul>
+      <li class="active" data-view="dashboard"><span class="nav-icon">📊</span> Kojelauta</li>
+      <li data-view="players"><span class="nav-icon">👥</span> Pelaajat</li>
+      <li data-view="poker"><span class="nav-icon">♠</span> Pokeripöytä</li>
+    </ul>
+  </nav>
+  <div class="sidebar-footer">v2.1 · Paikallinen · SQLite</div>
+</div>
+
+<!-- ── Main ─────────────────────────────────────────────────────────────────── -->
+<div id="main">
+
+<!-- ═══ KOJELAUTA ═══ -->
+<section id="view-dashboard" class="view active">
+  <div class="page-header">
+    <h1>Kojelauta</h1>
+    <button class="btn btn-ghost btn-sm" onclick="loadDashboard()">↻ Päivitä</button>
+  </div>
+  <div class="stat-grid" id="dash-stats"></div>
+  <div class="dash-cols">
+    <div class="panel">
+      <div class="panel-header"><h3>🏆 Suurimmat häviäjät</h3></div>
+      <div class="panel-body" id="dash-losers"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>💰 Suurimmat voittajat</h3></div>
+      <div class="panel-body" id="dash-winners"></div>
+    </div>
+  </div>
+  <div class="dash-cols">
+    <div class="panel">
+      <div class="panel-header"><h3>🎰 Tuotto peleittäin</h3></div>
+      <div class="panel-body" id="dash-games"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-header"><h3>🕐 Viimeisimmät tapahtumat</h3></div>
+      <div class="panel-body" id="dash-recent"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PELAAJAT ═══ -->
+<section id="view-players" class="view">
+  <div class="page-header">
+    <h1>Pelaajat</h1>
+    <button class="btn btn-gold" onclick="openAddModal()">+ Lisää pelaaja</button>
+  </div>
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="form-control" id="search-input" placeholder="Hae nimellä, sähköpostilla, puhelimella…" oninput="filterPlayers()">
+    </div>
+    <select class="form-control" id="vip-filter" style="width:auto" onchange="filterPlayers()">
+      <option value="">Kaikki VIP</option>
+      <option>Standard</option><option>Silver</option><option>Gold</option><option>Whale</option>
+    </select>
+  </div>
+  <div class="panel">
+    <div class="tbl-wrap">
+      <table id="players-table">
+        <thead><tr>
+          <th>Nimi</th><th>VIP</th>
+          <th class="col-hide-sm">Sähköposti</th>
+          <th class="col-hide-sm">Puhelin</th>
+          <th>Saldo</th>
+          <th class="col-hide-sm">Hävitty</th>
+          <th class="col-hide-sm">Tapahtumat</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="players-tbody"></tbody>
+      </table>
+    </div>
+    <div id="players-empty" class="empty-state" style="display:none">
+      <div class="empty-icon">👥</div>Ei pelaajia. Lisää ensimmäinen pelaaja!
+    </div>
+  </div>
+</section>
+
+<!-- ═══ POKERIPÖYTÄ ═══ -->
+<section id="view-poker" class="view">
+  <div class="page-header">
+    <h1>Pokeripöytä</h1>
+    <div class="flex flex-wrap">
+      <a href="/asiakas" target="_blank" class="btn btn-ghost btn-sm">🔗 Asiakassivu</a>
+      <button class="btn btn-ghost btn-sm" onclick="loadPoker()">↻ Päivitä</button>
+    </div>
+  </div>
+
+  <div class="join-url-box">
+    <span class="join-url-label">Pelaajan linkki</span>
+    <span class="join-url-text" id="join-url">http://{{ local_ip }}:5000/poker/join</span>
+    <button class="btn btn-ghost btn-sm" onclick="copyJoinUrl()">📋 Kopioi</button>
+  </div>
+
+  <div class="poker-stage-bar">
+    <div id="stage-pills" style="display:flex;gap:.5rem;flex-wrap:wrap"></div>
+    <div style="flex:1"></div>
+    <div class="poker-controls" id="poker-btns"></div>
+  </div>
+
+  <div class="felt-wrap">
+    <div class="felt-table">
+      <div class="community-label">Yhteiskortit</div>
+      <div class="community-cards" id="community-cards-display"></div>
+    </div>
+  </div>
+
+  <div id="seats-section">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <h3 style="font-family:'Playfair Display',serif;color:var(--gold)">Istuimet</h3>
+      <span id="seat-count" class="text-muted text-sm"></span>
+    </div>
+    <div class="seats-grid" id="seats-grid"></div>
+    <div id="poker-empty" class="empty-state">
+      <div class="empty-icon">♠</div>Ei aktiivista istuntoa. Luo uusi peli aloittaaksesi.
+    </div>
+  </div>
+
+  <div id="hand-results" class="hand-results" style="display:none">
+    <div class="panel">
+      <div class="panel-header">
+        <h3>🏆 Käsien tulokset</h3>
+        <button class="btn btn-ghost btn-sm" onclick="$('hand-results').style.display='none'">✕ Sulje</button>
+      </div>
+      <div class="panel-body" id="hand-results-body"></div>
+    </div>
+  </div>
+</section>
+
+</div><!-- #main -->
+</div><!-- #layout -->
+
+<!-- ═══ MODAL: Lisää / Muokkaa pelaaja ═══ -->
+<div class="modal-overlay" id="modal-player">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="modal-player-title">Lisää pelaaja</h2>
+      <button class="modal-close" onclick="closeModal('modal-player')">×</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-player-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Koko nimi *</label>
+          <input class="form-control" id="player-name" placeholder="esim. Matti Meikäläinen">
+        </div>
+        <div class="form-group">
+          <label>VIP-taso</label>
+          <select class="form-control" id="player-vip">
+            <option>Standard</option><option>Silver</option><option>Gold</option><option value="Whale">🐋 Whale</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Sähköposti</label>
+          <input class="form-control" id="player-email" type="email" placeholder="nimi@esimerkki.fi">
+        </div>
+        <div class="form-group">
+          <label>Puhelin</label>
+          <input class="form-control" id="player-phone" placeholder="+358 40 …">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Salasana <span id="pw-edit-hint" style="display:none;font-size:.72rem;color:var(--muted)">(tyhjä = ei muutosta)</span></label>
+          <input class="form-control" id="player-password" type="password" placeholder="Aseta kirjautumissalasana" autocomplete="new-password">
+          <span class="hint">Asiakassivun kirjautumista varten. Jätä tyhjäksi jos ei tarvita.</span>
+        </div>
+        <div class="form-group">
+          <label>Muistiinpanot</label>
+          <textarea class="form-control" id="player-notes" rows="2" placeholder="Sisäiset muistiinpanot…" style="resize:vertical"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-player')">Peruuta</button>
+      <button class="btn btn-gold" onclick="savePlayer()">Tallenna pelaaja</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Pelaajan tiedot ═══ -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal-box" style="width:min(760px,96vw)">
+    <div class="modal-head">
+      <h2 id="detail-title">Pelaajan tiedot</h2>
+      <button class="modal-close" onclick="closeModal('modal-detail')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="stat-grid" id="detail-stats" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin-bottom:1.1rem"></div>
+      <hr class="divider">
+
+      <!-- Tapahtuman kirjaus -->
+      <h3 style="font-family:'Playfair Display',serif;color:var(--gold);margin-bottom:.75rem;font-size:1rem">Kirjaa tapahtuma</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem" id="tx-form-grid">
+        <div class="form-group" style="margin:0">
+          <label>Tyyppi</label>
+          <select class="form-control" id="tx-type">
+            <option value="loss">Häviö (kasino voittaa)</option>
+            <option value="profit">Voitto (pelaaja voittaa)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Summa (€)</label>
+          <input class="form-control" id="tx-amount" type="number" step="0.01" min="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Peli</label>
+          <select class="form-control" id="tx-game">
+            <option>Blackjack</option><option>Poker</option><option>Slots</option>
+            <option>Roulette</option><option>Baccarat</option><option>Muu</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin:0">
+          <label>Muistiinpano</label>
+          <input class="form-control" id="tx-note" placeholder="vapaaehtoinen">
+        </div>
+      </div>
+      <button class="btn btn-gold mt-half" onclick="addTransaction()">+ Kirjaa tapahtuma</button>
+      <hr class="divider">
+
+      <!-- Bonusten hallinta -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;gap:.5rem;flex-wrap:wrap">
+        <h3 style="font-family:'Playfair Display',serif;color:var(--gold);font-size:1rem">🎁 Bonukset</h3>
+        <div class="flex">
+          <button class="btn btn-bonus btn-sm" onclick="openGiveBonusFromDetail()">🎁 Anna bonus →</button>
+          <button class="btn btn-ghost btn-sm" onclick="openAddBonusForm()">+ Lisää bonus</button>
+        </div>
+      </div>
+      <div id="add-bonus-form" style="display:none;background:var(--bg3);border-radius:8px;padding:1rem;margin-bottom:1rem">
+        <div style="display:grid;grid-template-columns:2fr 1fr auto;gap:.6rem;align-items:end">
+          <div class="form-group" style="margin:0">
+            <label>Bonuksen nimi</label>
+            <input class="form-control" id="bonus-label" placeholder="esim. Tervetuliaisbonus">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label>Arvo (€)</label>
+            <input class="form-control" id="bonus-amount" type="number" step="0.01" placeholder="0">
+          </div>
+          <button class="btn btn-gold" onclick="saveBonus()" style="margin-bottom:1rem">Tallenna</button>
+        </div>
+      </div>
+      <div id="bonus-list"></div>
+      <hr class="divider">
+
+      <!-- Tapahtumahistoria -->
+      <h3 style="font-family:'Playfair Display',serif;color:var(--gold);margin-bottom:.75rem;font-size:1rem">Tapahtumahistoria</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Päivämäärä</th><th>Tyyppi</th><th>Summa</th><th>Peli</th><th class="col-hide-sm">Muistiinpano</th><th></th></tr></thead>
+          <tbody id="tx-tbody"></tbody>
+        </table>
+        <div id="tx-empty" class="empty-state" style="display:none;padding:1.5rem">Ei tapahtumia vielä.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Anna bonus (pikavalikko) ═══ -->
+<div class="modal-overlay" id="modal-give-bonus">
+  <div class="modal-box" style="width:min(420px,96vw)">
+    <div class="modal-head">
+      <h2>🎁 Anna bonus pelaajalle</h2>
+      <button class="modal-close" onclick="closeModal('modal-give-bonus')">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="give-bonus-player-label" style="color:var(--muted);font-size:.9rem;margin-bottom:1.25rem"></p>
+      <div class="form-group">
+        <label>Bonuksen nimi</label>
+        <input class="form-control" id="gbonus-label" placeholder="esim. Tervetuliaisbonus 50€">
+      </div>
+      <div class="form-group">
+        <label>Arvo (€)</label>
+        <input class="form-control" id="gbonus-amount" type="number" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.75rem;font-size:.82rem;color:var(--muted);margin-top:.5rem">
+        💡 Bonus ilmestyy välittömästi pelaajan näytölle ilmoituksena.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-give-bonus')">Peruuta</button>
+      <button class="btn btn-gold" onclick="doGiveBonus()">Lähetä bonus →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Anna pyöräytyksiä ═══ -->
+<div class="modal-overlay" id="modal-grant-spins">
+  <div class="modal-box" style="width:min(420px,96vw)">
+    <div class="modal-head">
+      <h2>🎰 Anna pyöräytyksiä</h2>
+      <button class="modal-close" onclick="closeModal('modal-grant-spins')">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="grant-spins-player-label" style="color:var(--muted);font-size:.9rem;margin-bottom:.75rem"></p>
+      <p style="font-size:.82rem;margin-bottom:1rem">Jäljellä nyt: <strong id="grant-spins-current">0</strong></p>
+      <div class="form-group">
+        <label>Määrä (kpl)</label>
+        <input class="form-control" id="grant-spins-count" type="number" step="1" min="-99" max="99" value="1">
+        <div class="text-muted text-sm" style="margin-top:.35rem">Voit syöttää myös negatiivisen arvon vähentääksesi.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-grant-spins')">Peruuta</button>
+      <button class="btn btn-gold" onclick="doGrantSpins()">Anna pyöräytykset →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL: Ennalta asetetut kädet ═══ -->
+<div class="modal-overlay" id="modal-preset">
+  <div class="modal-box" style="width:min(800px,96vw)">
+    <div class="modal-head">
+      <h2>🃏 Aseta kädet etukäteen</h2>
+      <button class="modal-close" onclick="closeModal('modal-preset')">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="text-muted text-sm" style="margin-bottom:1rem">Valitse enintään 2 korttia per pelaaja. Pelaajat joille ei ole asetettu kortteja saavat satunnaiset kortit.</p>
+      <div id="preset-seats-list"></div>
+      <hr class="divider">
+      <h3 style="font-family:'Playfair Display',serif;color:var(--gold);font-size:1rem;margin-bottom:.75rem">Korttipakka</h3>
+      <p class="text-muted text-sm" style="margin-bottom:.5rem">Klikkaa korttia valitaksesi sen aktiiviselle pelipaikalle.</p>
+      <div id="active-preset-seat" style="margin-bottom:.5rem;font-size:.85rem;color:var(--gold)">Valitse ensin paikka yllä.</div>
+      <div class="card-picker" id="card-picker-grid"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-preset')">Peruuta</button>
+      <button class="btn btn-red btn-sm" onclick="clearPresets()">Tyhjennä kaikki</button>
+      <button class="btn btn-gold" onclick="savePresets()">Tallenna kädet</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let S = {
+  players: [], dashboard: null, poker: null,
+  detailPlayerId: null, pokerInterval: null,
+  giveBonusPlayerId: null,
+  grantSpinsPlayerId: null,
+  presets: {}, activePick: null,
+};
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function fmtDate(s){ const d=new Date(s); return d.toLocaleDateString('fi-FI')+' '+d.toLocaleTimeString('fi-FI',{hour:'2-digit',minute:'2-digit'}); }
+function vipBadge(v){ return `<span class="vip vip-${v}">${v==='Whale'?'🐋 ':''}${v}</span>`; }
+function toast(msg,type='info'){
+  const el=document.createElement('div');
+  el.className=`toast ${type}`;el.textContent=msg;
+  $('toast-container').appendChild(el);
+  setTimeout(()=>el.remove(),3500);
+}
+async function api(method,url,body){
+  const opts={method,headers:{'Content-Type':'application/json'}};
+  if(body) opts.body=JSON.stringify(body);
+  const r=await fetch(url,opts);
+  const j=await r.json();
+  if(!r.ok) throw new Error(j.error||'Pyyntö epäonnistui');
+  return j;
+}
+
+// ── Sidebar (tablet) ───────────────────────────────────────────────────────
+function toggleSidebar(){
+  const s=$('sidebar'),o=$('sidebar-overlay');
+  const open=s.classList.toggle('open');
+  if(open) o.classList.add('open'); else o.classList.remove('open');
+}
+function closeSidebar(){
+  $('sidebar').classList.remove('open');
+  $('sidebar-overlay').classList.remove('open');
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('nav li').forEach(l=>l.classList.remove('active'));
+  $('view-'+name).classList.add('active');
+  document.querySelector(`nav li[data-view="${name}"]`).classList.add('active');
+  closeSidebar();
+  if(name==='dashboard') loadDashboard();
+  if(name==='players')   loadPlayers();
+  if(name==='poker'){
+    loadPoker();
+    if(!S.pokerInterval) S.pokerInterval=setInterval(loadPoker,3000);
+  } else {
+    clearInterval(S.pokerInterval); S.pokerInterval=null;
+  }
+}
+document.querySelectorAll('nav li[data-view]').forEach(li=>li.addEventListener('click',()=>showView(li.dataset.view)));
+
+function openModal(id){$(id).classList.add('open')}
+function closeModal(id){$(id).classList.remove('open')}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open')}));
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+async function loadDashboard(){
+  try{ const d=await api('GET','/api/dashboard'); S.dashboard=d; renderDashboard(d); }
+  catch(e){ toast(e.message,'error'); }
+}
+function renderDashboard(d){
+  $('dash-stats').innerHTML=`
+    <div class="stat-card"><div class="label">Kasino tulot</div><div class="value c-green">€${d.house_revenue.toFixed(2)}</div><div class="sub">Pelaajien häviöt</div></div>
+    <div class="stat-card"><div class="label">Maksettu ulos</div><div class="value c-red">€${d.total_payouts.toFixed(2)}</div><div class="sub">Voitot pelaajille</div></div>
+    <div class="stat-card"><div class="label">Kasino netto</div><div class="value ${d.net_house>=0?'c-gold':'c-red'}">€${d.net_house.toFixed(2)}</div><div class="sub">Tulot − voitot</div></div>
+    <div class="stat-card"><div class="label">Pelaajat</div><div class="value c-cream">${d.total_players}</div><div class="sub">${d.total_transactions} tapahtumaa</div></div>`;
+  const rc=i=>i===0?'gold':i===1?'silver':i===2?'bronze':'';
+  $('dash-losers').innerHTML=d.top_losers.length?d.top_losers.map((p,i)=>`
+    <div class="leaderboard-item">
+      <div class="lb-rank ${rc(i)}">${i+1}</div>
+      <div class="lb-name">${esc(p.name)}<br><span class="text-sm text-muted">${vipBadge(p.vip_level)}</span></div>
+      <div class="lb-amount c-green">€${Math.abs(p.net).toFixed(2)}</div>
+    </div>`).join(''):'<p class="text-muted text-sm">Ei dataa vielä.</p>';
+  $('dash-winners').innerHTML=d.top_winners.length?d.top_winners.map((p,i)=>`
+    <div class="leaderboard-item">
+      <div class="lb-rank ${rc(i)}">${i+1}</div>
+      <div class="lb-name">${esc(p.name)}<br><span class="text-sm text-muted">${vipBadge(p.vip_level)}</span></div>
+      <div class="lb-amount c-red">€${p.net.toFixed(2)}</div>
+    </div>`).join(''):'<p class="text-muted text-sm">Ei dataa vielä.</p>';
+  $('dash-games').innerHTML=d.by_game.length?d.by_game.map(g=>`
+    <div class="leaderboard-item">
+      <div class="lb-name">${esc(g.game_type)}</div>
+      <div class="text-muted text-sm">${g.cnt} kpl</div>
+      <div class="lb-amount c-gold">€${(g.house_take||0).toFixed(2)}</div>
+    </div>`).join(''):'<p class="text-muted text-sm">Ei dataa vielä.</p>';
+  $('dash-recent').innerHTML=d.recent_transactions.length?d.recent_transactions.map(t=>`
+    <div class="feed-item">
+      <div class="feed-dot ${t.amount<0?'loss':'win'}"></div>
+      <div style="flex:1"><span class="bold">${esc(t.player_name)}</span><span class="text-muted text-sm"> · ${esc(t.game_type)}</span></div>
+      <div class="${t.amount<0?'c-green':'c-red'} bold">${t.amount<0?'+€'+Math.abs(t.amount).toFixed(2):'-€'+t.amount.toFixed(2)}</div>
+    </div>`).join(''):'<p class="text-muted text-sm">Ei tapahtumia vielä.</p>';
+}
+
+// ── Players ────────────────────────────────────────────────────────────────
+async function loadPlayers(){
+  try{ S.players=await api('GET','/api/players'); renderPlayers(S.players); }
+  catch(e){ toast(e.message,'error'); }
+}
+function filterPlayers(){
+  const q=$('search-input').value.toLowerCase(), vip=$('vip-filter').value;
+  let list=S.players;
+  if(q) list=list.filter(p=>(p.name+p.email+p.phone).toLowerCase().includes(q));
+  if(vip) list=list.filter(p=>p.vip_level===vip);
+  renderPlayers(list);
+}
+function renderPlayers(list){
+  const tbody=$('players-tbody'), empty=$('players-empty');
+  if(!list.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  tbody.innerHTML=list.map(p=>`
+    <tr>
+      <td><span class="bold">${esc(p.name)}</span></td>
+      <td>${vipBadge(p.vip_level)}</td>
+      <td class="text-muted text-sm truncate col-hide-sm">${esc(p.email||'—')}</td>
+      <td class="text-muted text-sm col-hide-sm">${esc(p.phone||'—')}</td>
+      <td class="${p.net_balance<=0?'c-green':'c-red'} bold">€${Math.abs(p.net_balance).toFixed(2)}</td>
+      <td class="c-green text-sm col-hide-sm">€${(p.total_lost||0).toFixed(2)}</td>
+      <td class="text-muted text-sm col-hide-sm">${p.tx_count}</td>
+      <td>
+        <div class="flex flex-wrap" style="gap:.3rem">
+          <button class="btn btn-bonus btn-sm" onclick="openGiveBonusModal(${p.id},'${esc(p.name)}')">🎁</button>
+          <button class="btn btn-gold btn-sm" title="Anna pyöräytyksiä (${p.spins_remaining||0} jäljellä)" onclick="openGrantSpinsModal(${p.id},'${esc(p.name)}',${p.spins_remaining||0})">🎰 ${p.spins_remaining||0}</button>
+          <button class="btn btn-ghost btn-sm" onclick="openDetailModal(${p.id})">Näytä</button>
+          <button class="btn btn-ghost btn-sm" onclick="openEditModal(${p.id})">Muokkaa</button>
+          <button class="btn btn-red btn-sm" onclick="deletePlayer(${p.id},'${esc(p.name)}')">✕</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+function openAddModal(){
+  $('modal-player-title').textContent='Lisää pelaaja';
+  $('edit-player-id').value='';
+  $('pw-edit-hint').style.display='none';
+  ['player-name','player-email','player-phone','player-notes','player-password'].forEach(id=>$(id).value='');
+  $('player-vip').value='Standard';
+  openModal('modal-player');
+  setTimeout(()=>$('player-name').focus(),50);
+}
+function openEditModal(id){
+  const p=S.players.find(x=>x.id===id); if(!p) return;
+  $('modal-player-title').textContent='Muokkaa pelaajaa';
+  $('edit-player-id').value=id;
+  $('pw-edit-hint').style.display='inline';
+  $('player-name').value=p.name;$('player-email').value=p.email||'';
+  $('player-phone').value=p.phone||'';$('player-vip').value=p.vip_level;
+  $('player-notes').value=p.notes||'';$('player-password').value='';
+  openModal('modal-player');
+}
+async function savePlayer(){
+  const name=$('player-name').value.trim();
+  if(!name){toast('Nimi vaaditaan.','error');return;}
+  const body={
+    name, email:$('player-email').value.trim(), phone:$('player-phone').value.trim(),
+    vip_level:$('player-vip').value, notes:$('player-notes').value.trim(),
+    password:$('player-password').value,
+  };
+  try{
+    const id=$('edit-player-id').value;
+    if(id){await api('PUT',`/api/players/${id}`,body);toast('Pelaaja päivitetty.','success');}
+    else{await api('POST','/api/players',body);toast('Pelaaja lisätty.','success');}
+    closeModal('modal-player');loadPlayers();
+  }catch(e){toast(e.message,'error');}
+}
+async function deletePlayer(id,name){
+  if(!confirm(`Poistetaanko ${name} ja kaikki hänen tapahtumat?`)) return;
+  try{await api('DELETE',`/api/players/${id}`);toast('Pelaaja poistettu.','success');loadPlayers();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ── Player Detail ──────────────────────────────────────────────────────────
+async function openDetailModal(id){
+  S.detailPlayerId=id;
+  const p=S.players.find(x=>x.id===id); if(!p) return;
+  $('detail-title').textContent=p.name+' · '+p.vip_level;
+  refreshDetailStats(p);
+  $('add-bonus-form').style.display='none';
+  openModal('modal-detail');
+  loadTransactions(id);
+  loadBonuses(id);
+}
+function refreshDetailStats(p){
+  $('detail-stats').innerHTML=`
+    <div class="stat-card"><div class="label">Nettosaldo</div><div class="value ${p.net_balance<=0?'c-green':'c-red'}">€${Math.abs(p.net_balance).toFixed(2)}</div></div>
+    <div class="stat-card"><div class="label">Hävitty</div><div class="value c-green">€${(p.total_lost||0).toFixed(2)}</div></div>
+    <div class="stat-card"><div class="label">Voitettu</div><div class="value c-red">€${(p.total_won||0).toFixed(2)}</div></div>
+    <div class="stat-card"><div class="label">Tapahtumat</div><div class="value c-cream">${p.tx_count}</div></div>`;
+}
+async function loadTransactions(pid){
+  try{
+    const txs=await api('GET',`/api/players/${pid}/transactions`);
+    const tbody=$('tx-tbody'),empty=$('tx-empty');
+    if(!txs.length){tbody.innerHTML='';empty.style.display='block';return;}
+    empty.style.display='none';
+    tbody.innerHTML=txs.map(t=>`
+      <tr>
+        <td class="text-sm text-muted">${fmtDate(t.created_at)}</td>
+        <td>${t.amount<0?'<span class="c-green text-sm">Kasino voitti</span>':'<span class="c-red text-sm">Pelaaja voitti</span>'}</td>
+        <td class="${t.amount<0?'c-green':'c-red'} bold">${t.amount<0?'+€'+Math.abs(t.amount).toFixed(2):'-€'+t.amount.toFixed(2)}</td>
+        <td class="text-sm">${esc(t.game_type)}</td>
+        <td class="text-muted text-sm col-hide-sm">${esc(t.note||'—')}</td>
+        <td><button class="btn btn-ghost btn-sm" onclick="deleteTx(${t.id})">✕</button></td>
+      </tr>`).join('');
+  }catch(e){toast(e.message,'error');}
+}
+async function addTransaction(){
+  const pid=S.detailPlayerId, type=$('tx-type').value, amt=parseFloat($('tx-amount').value);
+  if(!amt||amt<=0){toast('Anna kelvollinen summa.','error');return;}
+  const amount=type==='loss'?-Math.abs(amt):Math.abs(amt);
+  try{
+    await api('POST',`/api/players/${pid}/transactions`,{amount,game_type:$('tx-game').value,note:$('tx-note').value.trim()});
+    $('tx-amount').value='';$('tx-note').value='';
+    toast('Tapahtuma kirjattu.','success');
+    await loadTransactions(pid);await loadPlayers();
+    const p2=S.players.find(x=>x.id===pid);if(p2) refreshDetailStats(p2);
+  }catch(e){toast(e.message,'error');}
+}
+async function deleteTx(tid){
+  if(!confirm('Poistetaanko tämä tapahtuma?')) return;
+  try{await api('DELETE',`/api/transactions/${tid}`);toast('Poistettu.','success');await loadTransactions(S.detailPlayerId);loadPlayers();}
+  catch(e){toast(e.message,'error');}
+}
+
+// ── Bonuses ────────────────────────────────────────────────────────────────
+async function loadBonuses(pid){
+  try{
+    const bonuses=await api('GET',`/api/players/${pid}/bonuses`);
+    const el=$('bonus-list');
+    if(!bonuses.length){el.innerHTML='<p class="text-muted text-sm">Ei bonuksia.</p>';return;}
+    el.innerHTML=bonuses.map(b=>`
+      <div class="bonus-item ${b.claimed?'bonus-claimed':''}">
+        <span class="bonus-tag">${b.claimed?'Käytetty':'Aktiivinen'}</span>
+        <span style="flex:1">${esc(b.label)}</span>
+        <span class="c-gold bold" style="margin-right:.5rem">€${parseFloat(b.amount).toFixed(2)}</span>
+        ${!b.claimed?`<button class="btn btn-ghost btn-sm" onclick="deleteBonus(${b.id})">✕</button>`:''}
+      </div>`).join('');
+  }catch(e){toast(e.message,'error');}
+}
+function openAddBonusForm(){$('add-bonus-form').style.display=$('add-bonus-form').style.display==='none'?'block':'none';}
+async function saveBonus(){
+  const pid=S.detailPlayerId,label=$('bonus-label').value.trim(),amount=parseFloat($('bonus-amount').value)||0;
+  if(!label){toast('Anna bonuksen nimi.','error');return;}
+  try{
+    await api('POST',`/api/players/${pid}/bonuses`,{label,amount});
+    $('bonus-label').value='';$('bonus-amount').value='';
+    $('add-bonus-form').style.display='none';
+    toast('Bonus lisätty.','success');loadBonuses(pid);
+  }catch(e){toast(e.message,'error');}
+}
+async function deleteBonus(bid){
+  if(!confirm('Poistetaanko tämä bonus?')) return;
+  try{await api('DELETE',`/api/bonuses/${bid}`);toast('Poistettu.','success');loadBonuses(S.detailPlayerId);}
+  catch(e){toast(e.message,'error');}
+}
+
+// ── Give Bonus (realtime notification) ────────────────────────────────────
+function openGiveBonusModal(pid, name){
+  S.giveBonusPlayerId=pid;
+  $('give-bonus-player-label').textContent=`Pelaaja: ${name}`;
+  $('gbonus-label').value=''; $('gbonus-amount').value='';
+  openModal('modal-give-bonus');
+  setTimeout(()=>$('gbonus-label').focus(),50);
+}
+function openGiveBonusFromDetail(){
+  const pid=S.detailPlayerId;
+  const p=S.players.find(x=>x.id===pid);
+  if(!p) return;
+  closeModal('modal-detail');
+  openGiveBonusModal(pid, p.name);
+}
+async function doGiveBonus(){
+  const pid=S.giveBonusPlayerId;
+  const label=$('gbonus-label').value.trim();
+  const amount=parseFloat($('gbonus-amount').value)||0;
+  if(!label){toast('Anna bonuksen nimi.','error');return;}
+  if(!pid){toast('Ei valittua pelaajaa.','error');return;}
+  try{
+    // notify:true means seen=0 → triggers notification on customer screen
+    await api('POST',`/api/players/${pid}/bonuses`,{label,amount,notify:true});
+    closeModal('modal-give-bonus');
+    toast(`Bonus "${label}" lähetetty pelaajalle! 🎁`,'success');
+    loadPlayers();
+  }catch(e){toast(e.message,'error');}
+}
+
+// ── Grant spins ────────────────────────────────────────────────────────────
+function openGrantSpinsModal(pid, name, currentRemaining){
+  S.grantSpinsPlayerId = pid;
+  $('grant-spins-player-label').textContent = `Pelaaja: ${name}`;
+  $('grant-spins-current').textContent = currentRemaining || 0;
+  $('grant-spins-count').value = 1;
+  openModal('modal-grant-spins');
+  setTimeout(()=>$('grant-spins-count').focus(),50);
+}
+async function doGrantSpins(){
+  const pid = S.grantSpinsPlayerId;
+  const count = parseInt($('grant-spins-count').value, 10);
+  if(!pid){ toast('Ei valittua pelaajaa.','error'); return; }
+  if(!Number.isFinite(count) || count === 0){ toast('Syötä määrä (ei 0).','error'); return; }
+  try{
+    const r = await api('POST',`/api/players/${pid}/grant-spins`,{count});
+    closeModal('modal-grant-spins');
+    const verb = count > 0 ? 'Annettu' : 'Poistettu';
+    toast(`${verb} ${Math.abs(count)} pyöräytystä · jäljellä ${r.spins_remaining}`,'success');
+    loadPlayers();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ── Card renderer ──────────────────────────────────────────────────────────
+function renderCard(card,size='md'){
+  if(!card||!card.rank) return `<div class="card back ${size}"></div>`;
+  const red=card.suit==='♥'||card.suit==='♦';
+  return `<div class="card ${red?'red':'black'} ${size}">
+    <div class="corner tl"><div class="crank">${card.rank}</div><div class="csuit">${card.suit}</div></div>
+    <div class="center">${card.suit}</div>
+    <div class="corner br"><div class="crank">${card.rank}</div><div class="csuit">${card.suit}</div></div>
+  </div>`;
+}
+function renderEmpty(size='md'){return `<div class="card empty ${size}"></div>`;}
+function renderBack(size='md'){return `<div class="card back ${size}"></div>`;}
+
+// ── Poker table ────────────────────────────────────────────────────────────
+const STAGES=['waiting','preflop','flop','turn','river','showdown'];
+const STAGE_FI={waiting:'Odottaa',preflop:'Pre-Flop',flop:'Flop',turn:'Turn',river:'River',showdown:'Showdown'};
+
+async function loadPoker(){
+  try{const d=await api('GET','/api/poker/state');S.poker=d;renderPoker(d);}
+  catch(e){toast(e.message,'error');}
+}
+function renderPoker(d){
+  const stage=d.stage||'waiting';
+  $('stage-pills').innerHTML=STAGES.map(s=>`<div class="stage-pill ${s===stage?'active':''}">${STAGE_FI[s]}</div>`).join('');
+
+  let btns='';
+  if(d.status==='none'||!d.status)
+    btns+=`<button class="btn btn-gold" onclick="pokerNew()">Uusi peli</button>`;
+  if(d.status==='waiting'&&d.seats&&d.seats.filter(s=>s.active).length>0){
+    btns+=`<button class="btn btn-ghost btn-sm" onclick="openPresetModal()">🃏 Aseta kädet</button>`;
+    btns+=`<button class="btn btn-green" onclick="pokerDeal()">Jaa kortit</button>`;
+  }
+  if(d.status==='active'&&['preflop','flop','turn','river'].includes(stage)){
+    const lbl={preflop:'Jaa Flop',flop:'Jaa Turn',turn:'Jaa River',river:'Showdown'}[stage];
+    btns+=`<button class="btn btn-gold" onclick="pokerAdvance()">${lbl}</button>`;
+  }
+  if(d.status==='active')
+    btns+=`<button class="btn btn-red" onclick="pokerVoid()">⚡ Mitätöi käsi</button>`;
+  if(stage==='showdown'){
+    btns+=`<button class="btn btn-gold" onclick="evaluateHands()">🏆 Näytä voittaja</button>`;
+    btns+=`<button class="btn btn-outline-gold" onclick="pokerVoid()">Uusi käsi</button>`;
+  }
+  if(d.status==='active'&&['flop','turn','river'].includes(stage))
+    btns+=`<button class="btn btn-ghost btn-sm" onclick="evaluateHands()">🃏 Arvioi kädet</button>`;
+  $('poker-btns').innerHTML=btns;
+
+  const comm=d.community_cards||[];
+  let ch='';
+  if(comm.length>0){
+    for(let i=0;i<comm.length;i++) ch+=renderCard(comm[i],'md');
+    for(let i=comm.length;i<5;i++) ch+=renderEmpty('md');
+  } else if(stage!=='waiting'&&d.status!=='none'&&d.status)
+    for(let i=0;i<5;i++) ch+=renderEmpty('md');
+  $('community-cards-display').innerHTML=ch||`<span style="opacity:.4;font-size:.8rem">Kortit ilmestyvät tähän</span>`;
+
+  const seats=(d.seats||[]).filter(s=>s.active);
+  $('seat-count').textContent=seats.length?`${seats.length} pelaaja${seats.length!==1?'a':''} pöydässä`:'';
+  $('poker-empty').style.display=(!seats.length&&(d.status==='none'||!d.status))?'block':'none';
+
+  $('seats-grid').innerHTML=seats.map(s=>{
+    const hasCards=s.hole_cards&&s.hole_cards.length===2;
+    let cardHtml='';
+    if(hasCards){
+      if(s.show_cards)
+        cardHtml=renderCard(s.hole_cards[0],'sm')+renderCard(s.hole_cards[1],'sm');
+      else
+        cardHtml=renderBack('sm')+renderBack('sm');
+    } else if(stage!=='waiting')
+      cardHtml=renderEmpty('sm')+renderEmpty('sm');
+
+    const vis=hasCards?(s.show_cards?'<span class="show-indicator visible">👁 Näkyy</span>':'<span class="show-indicator hidden">🙈 Piilotettu</span>'):'';
+    const foldedLabel=s.folded?'<span class="seat-status folded-label">LUOVUTTANUT</span>':'';
+    return `
+      <div class="seat-card ${s.folded?'folded':''}">
+        <div class="seat-top">
+          <div class="seat-num">${s.seat_number}</div>
+          <div class="seat-name" title="${esc(s.player_name)}">${esc(s.player_name)}</div>
+          ${foldedLabel}
+        </div>
+        <div class="seat-hole-cards">${cardHtml}${vis}</div>
+        <div class="seat-actions">
+          ${!s.folded&&d.status==='active'?`<button class="btn btn-ghost btn-sm" onclick="pokerFold(${s.id})">Luovuta</button>`:''}
+          <button class="btn btn-red btn-sm" onclick="pokerRemove(${s.id})">Poista</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function pokerNew(){try{await api('POST','/api/poker/new');toast('Uusi peli luotu.','success');loadPoker();}catch(e){toast(e.message,'error');}}
+async function pokerDeal(){try{await api('POST','/api/poker/deal');toast('Kortit jaettu!','success');loadPoker();}catch(e){toast(e.message,'error');}}
+async function pokerAdvance(){try{const r=await api('POST','/api/poker/advance');toast(`Edistytty: ${STAGE_FI[r.stage]}`,'info');loadPoker();}catch(e){toast(e.message,'error');}}
+async function pokerVoid(){if(!confirm('Mitätöidäänkö käsi?'))return;try{await api('POST','/api/poker/void');toast('Käsi mitätöity.','info');$('hand-results').style.display='none';loadPoker();}catch(e){toast(e.message,'error');}}
+async function pokerFold(id){try{await api('POST',`/api/poker/fold/${id}`);loadPoker();}catch(e){toast(e.message,'error');}}
+async function pokerRemove(id){if(!confirm('Poistetaanko pelaaja pöydästä?'))return;try{await api('DELETE',`/api/poker/remove/${id}`);loadPoker();}catch(e){toast(e.message,'error');}}
+function copyJoinUrl(){navigator.clipboard.writeText($('join-url').textContent).then(()=>toast('Linkki kopioitu!','success'));}
+
+// ── Hand evaluation ────────────────────────────────────────────────────────
+async function evaluateHands(){
+  try{
+    const results=await api('GET','/api/poker/evaluate');
+    const el=$('hand-results'),body=$('hand-results-body');
+    el.style.display='block';
+    el.scrollIntoView({behavior:'smooth',block:'nearest'});
+    if(!results.length){body.innerHTML='<p class="text-muted text-sm">Ei aktiivisia pelaajia arvioitavaksi.</p>';return;}
+    const rc=i=>i===0?'first':i===1?'second':i===2?'third':'';
+    body.innerHTML=results.map((r,i)=>`
+      <div class="hand-result-item ${r.is_winner?'winner':''}">
+        <div class="hand-rank-badge ${rc(i)}">${i+1}</div>
+        <div style="flex:1">
+          <div class="flex" style="gap:.5rem;margin-bottom:.3rem">
+            <span class="bold">${esc(r.player_name)}</span>
+            ${r.is_winner?'<span style="font-size:1.2rem">👑</span>':''}
+          </div>
+          <div class="flex" style="gap:.4rem">
+            <span class="hand-name-tag rank-${r.hand_rank}">${esc(r.hand_name)}</span>
+            <span class="text-muted text-sm">Paikka ${r.seat_number}</span>
+          </div>
+        </div>
+        <div class="flex" style="gap:.3rem">${r.hole_cards.map(c=>renderCard(c,'sm')).join('')}</div>
+      </div>`).join('');
+  }catch(e){toast(e.message,'error');}
+}
+
+// ── Preset hands ───────────────────────────────────────────────────────────
+const ALL_CARDS=[];
+['♠','♥','♦','♣'].forEach(s=>['2','3','4','5','6','7','8','9','10','J','Q','K','A'].forEach(r=>ALL_CARDS.push({rank:r,suit:s})));
+
+function openPresetModal(){
+  if(!S.poker||!S.poker.seats)return;
+  S.presets=JSON.parse(JSON.stringify(S.poker.preset_hands||{}));
+  S.activePick=null;
+  renderPresetModal();
+  openModal('modal-preset');
+}
+function renderPresetModal(){
+  const seats=(S.poker.seats||[]).filter(s=>s.active);
+  $('preset-seats-list').innerHTML=seats.map(s=>{
+    const cards=S.presets[s.id]||[];
+    return `
+      <div class="preset-seat-row">
+        <div class="preset-seat-label" style="cursor:pointer;${S.activePick===s.id?'color:var(--gold)':''}" onclick="selectPresetSeat(${s.id})">
+          ${S.activePick===s.id?'▶ ':''} Paikka ${s.seat_number}: ${esc(s.player_name)}
+        </div>
+        <div class="preset-cards-display">
+          ${cards[0]?renderCard(cards[0],'sm'):renderEmpty('sm')}
+          ${cards[1]?renderCard(cards[1],'sm'):renderEmpty('sm')}
+        </div>
+        ${cards.length?`<button class="btn btn-ghost btn-sm" onclick="clearSeatPreset(${s.id})">✕</button>`:''}
+      </div>`;
+  }).join('');
+
+  const usedKeys=new Set(Object.values(S.presets).flat().map(c=>c.rank+'|'+c.suit));
+  $('card-picker-grid').innerHTML=ALL_CARDS.map(c=>{
+    const red=c.suit==='♥'||c.suit==='♦';
+    const key=c.rank+'|'+c.suit;
+    const used=usedKeys.has(key);
+    return `<div class="cp-card ${red?'red':'black'} ${used?'used':''}" onclick="pickCard(${JSON.stringify(c).replace(/"/g,"'")})">
+      <span>${c.rank}</span><span>${c.suit}</span>
+    </div>`;
+  }).join('');
+
+  $('active-preset-seat').textContent=S.activePick
+    ?`Valittu paikka: ${(S.poker.seats||[]).find(s=>s.id===S.activePick)?.player_name||S.activePick}`
+    :'Valitse ensin paikka yllä.';
+}
+function selectPresetSeat(id){S.activePick=id;renderPresetModal();}
+function pickCard(card){
+  if(!S.activePick){toast('Valitse ensin paikka.','error');return;}
+  const existing=S.presets[S.activePick]||[];
+  if(existing.length>=2){toast('Paikalla on jo 2 korttia. Tyhjennä ensin.','error');return;}
+  S.presets[S.activePick]=[...existing,card];
+  if((S.presets[S.activePick]||[]).length>=2) S.activePick=null;
+  renderPresetModal();
+}
+function clearSeatPreset(id){delete S.presets[id];renderPresetModal();}
+function clearPresets(){S.presets={};renderPresetModal();}
+async function savePresets(){
+  const payload={};
+  Object.entries(S.presets).forEach(([id,cards])=>{if(cards.length===2)payload[id]=cards;});
+  try{
+    await api('POST','/api/poker/preset',payload);
+    toast('Ennalta asetetut kädet tallennettu.','success');
+    closeModal('modal-preset');loadPoker();
+  }catch(e){toast(e.message,'error');}
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="theme-color" content="#0a1a10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Pokeripöytä</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#0a1a10;--bg2:#102018;--bg3:#163524;--bg4:#1c3f2b;
+  --gold:#c9a84c;--gold2:#e8c870;--cream:#f0ead8;
+  --red:#c0392b;--red2:#e74c3c;--green:#27ae60;
+  --muted:#5a8a6a;--border:#1a3a22;
+}
+html{height:100%;background:var(--bg)}
+body{
+  font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--cream);
+  display:flex;flex-direction:column;min-height:100dvh;overscroll-behavior:none;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+header{
+  width:100%;background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:calc(.75rem + env(safe-area-inset-top,0px)) 1.25rem .75rem;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+  position:sticky;top:0;z-index:10;
+}
+.brand{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--gold);display:flex;align-items:center;gap:.4rem}
+.stage-badge{padding:.35rem .9rem;border-radius:20px;font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--border);color:var(--muted)}
+.stage-badge.active{background:rgba(201,168,76,.15);border-color:var(--gold);color:var(--gold)}
+
+/* ── Scroll area ──────────────────────────────────────────────────────────── */
+main{
+  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  width:100%;max-width:520px;margin:0 auto;
+  padding:1.4rem 1rem calc(env(safe-area-inset-bottom,0px) + 1.5rem);
+  display:flex;flex-direction:column;align-items:center;gap:1.1rem;
+}
+
+/* ── Screens ─────────────────────────────────────────────────────────────── */
+.screen{display:none;width:100%;flex-direction:column;align-items:center;gap:1rem}
+.screen.active{display:flex}
+
+/* ── Login / waiting card ────────────────────────────────────────────────── */
+.hero{font-size:3.2rem;margin-top:.5rem;letter-spacing:.1em}
+.login-title{font-family:'Playfair Display',serif;font-size:1.85rem;color:var(--gold);text-align:center}
+.login-sub{color:var(--muted);font-size:.9rem;text-align:center;line-height:1.5}
+.form-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%}
+.field-label{display:block;font-size:.78rem;color:var(--muted);font-weight:600;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.35rem}
+input.inp{
+  width:100%;padding:.9rem 1.1rem;background:var(--bg);border:1px solid var(--border);
+  border-radius:10px;color:var(--cream);font-family:'DM Sans',sans-serif;font-size:1rem;
+  margin-bottom:.85rem;transition:border-color .2s;-webkit-appearance:none;
+}
+input.inp:focus{outline:none;border-color:var(--gold)}
+input.inp::placeholder{color:var(--muted)}
+input.inp:last-of-type{margin-bottom:0}
+.btn-gold{
+  display:block;width:100%;padding:1rem;background:var(--gold);color:#0a1a10;border:none;
+  border-radius:10px;font-family:'DM Sans',sans-serif;font-size:1.05rem;font-weight:700;
+  cursor:pointer;transition:opacity .15s;min-height:52px;margin-top:.85rem;
+}
+.btn-gold:hover:not(:disabled){opacity:.88}
+.btn-gold:active:not(:disabled){opacity:.72}
+.btn-gold:disabled{opacity:.45;cursor:not-allowed}
+.btn-ghost{
+  display:inline-flex;align-items:center;gap:.35rem;
+  background:transparent;border:1px solid var(--border);color:var(--muted);
+  border-radius:8px;padding:.6rem 1.1rem;font-size:.875rem;font-weight:600;cursor:pointer;
+  transition:all .2s;min-height:40px;
+}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+.err{color:#e74c3c;font-size:.88rem;text-align:center;min-height:1.3em;margin-top:.7rem;line-height:1.4}
+.hint{font-size:.78rem;color:var(--muted);text-align:center;margin-top:.5rem;line-height:1.5}
+
+/* ── Player bar ───────────────────────────────────────────────────────────── */
+.player-bar{
+  width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:12px;
+  padding:.85rem 1.1rem;display:flex;align-items:center;gap:.8rem;
+}
+.avatar{
+  width:2.2rem;height:2.2rem;border-radius:50%;background:var(--bg3);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.9rem;font-weight:700;color:var(--gold);flex-shrink:0;
+  border:1px solid rgba(201,168,76,.2);
+}
+.vip{display:inline-block;padding:.15rem .45rem;border-radius:4px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.vip-Standard{background:rgba(107,154,122,.15);color:#6b9a7a}
+.vip-Silver{background:rgba(192,192,192,.15);color:#c0c0c0}
+.vip-Gold{background:rgba(201,168,76,.18);color:var(--gold)}
+.vip-Whale{background:rgba(138,43,226,.2);color:#bf7fff}
+
+/* ── Status boxes ─────────────────────────────────────────────────────────── */
+.status-box{width:100%;border-radius:12px;padding:1.1rem 1.25rem;text-align:center;font-size:.95rem;font-weight:500}
+.status-box.waiting{background:rgba(201,168,76,.08);border:1px solid rgba(201,168,76,.2);color:var(--gold)}
+.status-box.info{background:var(--bg2);border:1px solid var(--border);color:var(--muted)}
+.status-box.showdown{background:rgba(39,174,96,.1);border:1px solid rgba(39,174,96,.3);color:var(--green);font-size:1.1rem}
+.status-box.no-game{background:var(--bg2);border:1px solid var(--border);color:var(--muted)}
+
+/* ── Pulse dot for waiting ────────────────────────────────────────────────── */
+.pulse-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--gold);margin-right:.4rem;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+/* ── Fold badge ───────────────────────────────────────────────────────────── */
+.fold-badge{padding:.3rem .75rem;border-radius:6px;background:rgba(192,57,43,.18);border:1px solid rgba(192,57,43,.35);color:#e74c3c;font-size:.78rem;font-weight:700;text-transform:uppercase;flex-shrink:0}
+
+/* ── Section label ────────────────────────────────────────────────────────── */
+.section-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;font-weight:600;align-self:flex-start}
+
+/* ── Show/hide toggle ─────────────────────────────────────────────────────── */
+.toggle-show-btn{
+  width:100%;padding:1rem 1.25rem;border-radius:12px;
+  border:2px solid rgba(192,57,43,.4);background:rgba(192,57,43,.08);color:#e74c3c;
+  font-family:'DM Sans',sans-serif;font-size:1rem;font-weight:600;cursor:pointer;
+  min-height:54px;display:flex;align-items:center;justify-content:center;gap:.5rem;transition:all .2s;
+}
+.toggle-show-btn.showing{border-color:rgba(39,174,96,.4);background:rgba(39,174,96,.1);color:var(--green)}
+.toggle-show-btn:active{opacity:.72}
+
+/* ── Playing cards ────────────────────────────────────────────────────────── */
+.card{background:white;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;position:relative;user-select:none;flex-shrink:0}
+.card.xl{width:110px;height:158px}
+.card.md{width:68px;height:98px}
+.card.red{color:#c0392b}.card.black{color:#111}
+.card .corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.card.xl .corner{font-size:1.15rem}.card.md .corner{font-size:.88rem}
+.card .corner.tl{top:8px;left:9px}.card .corner.br{bottom:8px;right:9px;transform:rotate(180deg)}
+.card.xl .center{font-size:2.9rem}.card.md .center{font-size:1.65rem}
+.card.back{background:linear-gradient(135deg,#0e3a1b 25%,#1a5c2e 25%,#1a5c2e 50%,#0e3a1b 50%,#0e3a1b 75%,#1a5c2e 75%);background-size:10px 10px;border:3px solid var(--gold)}
+.card.empty-slot{background:rgba(255,255,255,.05);border:2px dashed rgba(255,255,255,.15)}
+.hole-cards-wrap{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+
+/* ── Community section ────────────────────────────────────────────────────── */
+.community-section{width:100%;background:radial-gradient(ellipse at center,#1a5c2e,#0e3a1b);border:2px solid #2d6a3d;border-radius:16px;padding:1.25rem;display:flex;flex-direction:column;align-items:center;gap:.8rem}
+.community-cards-row{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+
+/* ── Spin wheel ───────────────────────────────────────────────────────────── */
+.spin-section{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.4rem;display:flex;flex-direction:column;align-items:center;gap:.9rem}
+.spin-title{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--gold);text-align:center}
+.spin-sub{font-size:.82rem;color:var(--muted);text-align:center;line-height:1.5}
+.wheel-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.wheel-pointer{position:absolute;top:-14px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:20px solid var(--gold);z-index:10;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+button.spin-btn{background:var(--gold);color:#0a1a10;border:none;border-radius:12px;padding:1rem 2rem;font-family:'DM Sans',sans-serif;font-size:1.05rem;font-weight:700;cursor:pointer;transition:opacity .15s;width:100%;min-height:52px}
+button.spin-btn:active:not(:disabled){opacity:.72}
+button.spin-btn:disabled{opacity:.4;cursor:not-allowed}
+.prize-result{width:100%;border-radius:12px;padding:1.2rem;text-align:center;display:none}
+.prize-result.won{background:rgba(201,168,76,.12);border:1px solid rgba(201,168,76,.35)}
+.prize-emoji{font-size:2.2rem;margin-bottom:.4rem}
+.prize-label{font-size:1.15rem;font-weight:700;color:var(--gold2)}
+.prize-desc{font-size:.82rem;color:var(--muted);margin-top:.35rem}
+.spin-used-msg{font-size:.82rem;color:var(--muted);text-align:center}
+
+/* ── Seat info bar ────────────────────────────────────────────────────────── */
+.seat-info-bar{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:.85rem 1.1rem;display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+.seat-num{width:2.2rem;height:2.2rem;background:var(--bg3);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;color:var(--gold);flex-shrink:0}
+.seat-name{font-weight:700;font-size:1.05rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+@media (max-width:360px){
+  .card.xl{width:95px;height:136px}
+  .card.xl .corner{font-size:1rem}
+  .card.xl .center{font-size:2.4rem}
+  .hole-cards-wrap{gap:.75rem}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand"><span>♠</span> Pokeripöytä</div>
+  <div class="stage-badge" id="stage-header">—</div>
+</header>
+
+<main>
+
+  <!-- ══ KIRJAUTUMINEN ══ -->
+  <div class="screen active" id="screen-login">
+    <div class="hero">♠♥♦♣</div>
+    <div class="login-title">Kirjaudu sisään</div>
+    <div class="login-sub">Kirjaudu pelaajatilillesi liittyäksesi pöytään</div>
+    <div class="form-card">
+      <label class="field-label">Käyttäjänimi</label>
+      <input class="inp" id="login-name" placeholder="Nimesi" maxlength="50" autocomplete="username"
+             onkeydown="if(event.key==='Enter')focusPw()">
+      <label class="field-label" style="margin-top:.85rem">Salasana <span style="color:var(--muted);text-transform:none;font-size:.72rem;letter-spacing:0">(jos asetettu)</span></label>
+      <input class="inp" id="login-pw" type="password" placeholder="Salasana" maxlength="100" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')doLogin()">
+      <button class="btn-gold" id="login-btn" onclick="doLogin()">Kirjaudu ja liity pöytään</button>
+      <div class="err" id="login-err"></div>
+      <div class="hint">Ei tiliä? Pyydä kasinon henkilökuntaa luomaan sinulle tili.</div>
+    </div>
+  </div>
+
+  <!-- ══ ODOTETAAN PELIÄ ══ -->
+  <div class="screen" id="screen-waiting">
+    <div class="player-bar" id="wait-player-bar">
+      <div class="avatar" id="wait-avatar">?</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:1rem" id="wait-name">—</div>
+        <div id="wait-vip" style="margin-top:.1rem"></div>
+      </div>
+      <button class="btn-ghost" onclick="logout()">Kirjaudu ulos</button>
+    </div>
+    <div class="status-box no-game" id="wait-status">
+      <span class="pulse-dot"></span>Odotetaan jakajaa…
+    </div>
+    <div style="color:var(--muted);font-size:.85rem;text-align:center;line-height:1.6">
+      Pöytä ei ole vielä auki tai peli on jo käynnissä.<br>
+      Tämä sivu päivittyy automaattisesti kun liittyminen on mahdollista.
+    </div>
+
+    <!-- Bonuspyörä myös odotustilassa -->
+    <div class="spin-section">
+      <div class="spin-title">🎰 Ilmainen bonuspyöräytys</div>
+      <div class="spin-sub">Yksi ilmainen pyöräytys per sessio — voita 10–100 % talletusbonus</div>
+      <div class="wheel-wrap">
+        <div class="wheel-pointer"></div>
+        <canvas id="wheel-canvas-wait" width="240" height="240"></canvas>
+      </div>
+      <div class="prize-result" id="prize-result-wait">
+        <div class="prize-emoji" id="prize-emoji-wait">🎉</div>
+        <div class="prize-label" id="prize-label-wait"></div>
+        <div class="prize-desc">Näytä tämä jakajalle lunastaksesi bonuksesi.</div>
+      </div>
+      <button class="spin-btn" id="spin-btn-wait" onclick="doSpin('wait')">Pyöritä pyörää</button>
+      <div class="spin-used-msg" id="spin-used-wait" style="display:none">Olet jo käyttänyt pyöräytyksesi.</div>
+    </div>
+  </div>
+
+  <!-- ══ PELI ══ -->
+  <div class="screen" id="screen-game">
+
+    <!-- Istuma- ja pelaajainfo -->
+    <div class="seat-info-bar">
+      <div class="seat-num" id="seat-num">—</div>
+      <div class="seat-name" id="seat-name">—</div>
+      <div class="fold-badge" id="fold-badge" style="display:none">Luovuttanut</div>
+    </div>
+
+    <!-- Tilaviesti -->
+    <div class="status-box waiting" id="game-status">Odotetaan jakajan aloitusta…</div>
+
+    <!-- Omat kortit -->
+    <div class="section-label">Sinun korttisi</div>
+    <div class="hole-cards-wrap" id="hole-cards">
+      <div class="card back xl"></div>
+      <div class="card back xl"></div>
+    </div>
+
+    <!-- Näytä/piilota toggle -->
+    <button class="toggle-show-btn" id="toggle-show-btn" onclick="toggleShowCards()" style="display:none">
+      🙈 Kortit piilotettu — napauta näyttääksesi muille
+    </button>
+
+    <!-- Yhteiskortit -->
+    <div class="community-section">
+      <div class="section-label" style="color:rgba(255,255,255,.4)">Yhteiskortit</div>
+      <div class="community-cards-row" id="community-row"></div>
+    </div>
+
+    <!-- Poistu-nappi -->
+    <button class="btn-ghost" style="width:100%;justify-content:center" onclick="leaveTable()">↩ Poistu pöydästä</button>
+
+    <!-- Bonuspyörä -->
+    <div class="spin-section">
+      <div class="spin-title">🎰 Ilmainen bonuspyöräytys</div>
+      <div class="spin-sub">Yksi ilmainen pyöräytys per sessio — voita 10–100 % talletusbonus</div>
+      <div class="wheel-wrap">
+        <div class="wheel-pointer"></div>
+        <canvas id="wheel-canvas-game" width="240" height="240"></canvas>
+      </div>
+      <div class="prize-result" id="prize-result-game">
+        <div class="prize-emoji" id="prize-emoji-game">🎉</div>
+        <div class="prize-label" id="prize-label-game"></div>
+        <div class="prize-desc">Näytä tämä jakajalle lunastaksesi bonuksesi.</div>
+      </div>
+      <button class="spin-btn" id="spin-btn-game" onclick="doSpin('game')">Pyöritä pyörää</button>
+      <div class="spin-used-msg" id="spin-used-game" style="display:none">Olet jo käyttänyt pyöräytyksesi.</div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+// ── Tila ───────────────────────────────────────────────────────────────────
+let player    = null;   // { id, name, vip_level, ... }
+let token     = null;   // poker join token
+let pollId    = null;
+let showingCards = false;
+
+// ── LocalStorage-avaimet ───────────────────────────────────────────────────
+const LS_NAME  = 'pp_name';
+const LS_PW    = 'pp_pw';
+const LS_ID    = 'pp_id';
+const LS_TOKEN = 'pp_token';
+
+function saveCreds(name, pw, id){
+  localStorage.setItem(LS_NAME, name);
+  localStorage.setItem(LS_PW, pw);
+  localStorage.setItem(LS_ID, String(id));
+}
+function clearCreds(){
+  [LS_NAME, LS_PW, LS_ID, LS_TOKEN].forEach(k=>localStorage.removeItem(k));
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+const bootName  = localStorage.getItem(LS_NAME);
+const bootPw    = localStorage.getItem(LS_PW) || '';
+const bootToken = localStorage.getItem(LS_TOKEN);
+
+drawWheel('wait');
+drawWheel('game');
+
+if(bootName){
+  // Try to re-authenticate silently
+  silentBoot(bootName, bootPw, bootToken);
+} else {
+  show('screen-login');
+}
+
+async function silentBoot(name, pw, existingToken){
+  try{
+    const r = await fetch('/api/customer/login',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, password: pw})
+    });
+    if(!r.ok){ clearCreds(); show('screen-login'); return; }
+    player = await r.json();
+    restoreSpinBoth();
+    renderPlayerBar();
+    // Try to use existing token first
+    if(existingToken){
+      const tr = await fetch(`/api/poker/player/${existingToken}`);
+      if(tr.ok){
+        token = existingToken;
+        show('screen-game');
+        startPolling();
+        return;
+      }
+    }
+    // No valid token — try to join or wait
+    await tryJoinOrWait();
+  }catch(e){
+    show('screen-login');
+  }
+}
+
+// ── Login ──────────────────────────────────────────────────────────────────
+function focusPw(){ document.getElementById('login-pw').focus(); }
+
+async function doLogin(){
+  const nameEl = document.getElementById('login-name');
+  const pwEl   = document.getElementById('login-pw');
+  const errEl  = document.getElementById('login-err');
+  const btn    = document.getElementById('login-btn');
+  const name   = nameEl.value.trim();
+  const pw     = pwEl.value;
+  if(!name){ errEl.textContent = 'Syötä käyttäjänimesi.'; return; }
+  btn.disabled = true; btn.textContent = 'Kirjaudutaan…';
+  errEl.textContent = '';
+  try{
+    const r = await fetch('/api/customer/login',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name, password: pw})
+    });
+    const d = await r.json();
+    if(!r.ok){
+      errEl.textContent = d.error || 'Kirjautuminen epäonnistui.';
+      if(d.needs_password) pwEl.focus();
+      return;
+    }
+    player = d;
+    saveCreds(name, pw, d.id);
+    restoreSpinBoth();
+    renderPlayerBar();
+    await tryJoinOrWait();
+  }catch(e){
+    errEl.textContent = 'Yhteysvirhe. Varmista, että olet samassa verkossa.';
+  }finally{
+    btn.disabled = false; btn.textContent = 'Kirjaudu ja liity pöytään';
+  }
+}
+
+// ── Kirjaudu ulos ──────────────────────────────────────────────────────────
+function logout(){
+  clearInterval(pollId);
+  clearCreds();
+  player = null; token = null; showingCards = false;
+  document.getElementById('login-name').value = '';
+  document.getElementById('login-pw').value   = '';
+  document.getElementById('login-err').textContent = '';
+  show('screen-login');
+}
+
+// ── Liity peliin tai odota ─────────────────────────────────────────────────
+async function tryJoinOrWait(){
+  if(!player) return;
+  try{
+    const r = await fetch('/api/poker/join',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({name: player.name, player_id: player.id})
+    });
+    const d = await r.json();
+    if(r.ok){
+      token = d.token;
+      localStorage.setItem(LS_TOKEN, token);
+      show('screen-game');
+      startPolling();
+    } else {
+      // Logged in but no open seat — go to waiting screen
+      token = null;
+      localStorage.removeItem(LS_TOKEN);
+      show('screen-waiting');
+      const msg = d.error || 'Odotetaan peliä…';
+      setWaitStatus(msg);
+      startWaiting();
+    }
+  }catch(e){
+    show('screen-waiting');
+    setWaitStatus('Yhteysvirhe. Yritetään uudelleen…');
+    startWaiting();
+  }
+}
+
+function setWaitStatus(msg){
+  const el = document.getElementById('wait-status');
+  el.innerHTML = `<span class="pulse-dot"></span>${msg}`;
+}
+
+// ── Polling: odottaa peliä ─────────────────────────────────────────────────
+function startWaiting(){
+  clearInterval(pollId);
+  pollId = setInterval(pollForGame, 2500);
+}
+
+async function pollForGame(){
+  try{
+    const gs = await fetch('/api/poker/state').then(r=>r.json());
+    // Update header badge
+    updateStageBadge(gs.stage, gs.status);
+    if(gs.status === 'waiting'){
+      setWaitStatus('Pöytä on auki — liitytään…');
+      clearInterval(pollId);
+      await tryJoinOrWait();
+    } else if(gs.status === 'active'){
+      setWaitStatus('Peli on jo käynnissä. Odotetaan seuraavaa kierrosta…');
+    } else {
+      setWaitStatus('Pöytä ei ole auki. Odotetaan jakajaa…');
+    }
+  }catch(e){}
+}
+
+// ── Polling: pelissä ───────────────────────────────────────────────────────
+function startPolling(){
+  clearInterval(pollId);
+  poll();
+  pollId = setInterval(poll, 2000);
+}
+
+async function poll(){
+  if(!token) return;
+  try{
+    const r = await fetch(`/api/poker/player/${token}`);
+    if(r.status === 404){
+      // Token vanhentunut — siirry odottamaan
+      token = null;
+      localStorage.removeItem(LS_TOKEN);
+      clearInterval(pollId);
+      show('screen-waiting');
+      setWaitStatus('Istunto päättyi. Odotetaan seuraavaa peliä…');
+      startWaiting();
+      return;
+    }
+    const d = await r.json();
+    if(!d.active){
+      // Paikka poistettu
+      token = null;
+      localStorage.removeItem(LS_TOKEN);
+      clearInterval(pollId);
+      show('screen-waiting');
+      setWaitStatus('Sinut poistettiin pöydästä. Odotetaan…');
+      startWaiting();
+      return;
+    }
+    if(typeof d.show_cards !== 'undefined'){
+      showingCards = !!d.show_cards;
+      updateShowBtn();
+    }
+    updateStageBadge(d.stage, d.status);
+    renderGameState(d);
+  }catch(e){}
+}
+
+// ── Renderöinti: pelaajapalkki ─────────────────────────────────────────────
+function renderPlayerBar(){
+  if(!player) return;
+  document.getElementById('wait-avatar').textContent = player.name[0].toUpperCase();
+  document.getElementById('wait-name').textContent   = player.name;
+  document.getElementById('wait-vip').innerHTML      = vipBadge(player.vip_level);
+}
+
+// ── Renderöinti: pelitila ──────────────────────────────────────────────────
+const STAGE_FI = {waiting:'Odottaa',preflop:'Preflop',flop:'Flop',turn:'Turn',river:'River',showdown:'Showdown'};
+
+function updateStageBadge(stage, status){
+  const el = document.getElementById('stage-header');
+  el.textContent = STAGE_FI[stage] || stage || '—';
+  el.className   = 'stage-badge' + (status === 'active' ? ' active' : '');
+}
+
+function renderGameState(d){
+  document.getElementById('seat-num').textContent  = d.seat;
+  document.getElementById('seat-name').textContent = d.name;
+  document.getElementById('fold-badge').style.display = d.folded ? 'block' : 'none';
+
+  // Tilaviesti
+  const statusEl = document.getElementById('game-status');
+  if(d.status === 'waiting' || d.stage === 'waiting'){
+    statusEl.className = 'status-box waiting';
+    statusEl.textContent = '⏳ Odotetaan jakajan aloitusta…';
+  } else if(d.stage === 'showdown'){
+    statusEl.className = 'status-box showdown';
+    statusEl.textContent = '🏆 Showdown — paljasta korttisi!';
+  } else if(d.folded){
+    statusEl.className = 'status-box info';
+    statusEl.textContent = 'Luovutit — seuraat loppupelin.';
+  } else {
+    statusEl.className = 'status-box info';
+    statusEl.textContent = `Kierros: ${STAGE_FI[d.stage] || d.stage}`;
+  }
+
+  // Näytä/piilota-painike
+  const toggleBtn = document.getElementById('toggle-show-btn');
+  toggleBtn.style.display = (d.hole_cards && d.hole_cards.length === 2) ? 'flex' : 'none';
+
+  // Käsikortti
+  const holeEl = document.getElementById('hole-cards');
+  if(d.hole_cards && d.hole_cards.length === 2){
+    holeEl.innerHTML = renderCard(d.hole_cards[0],'xl') + renderCard(d.hole_cards[1],'xl');
+  } else {
+    holeEl.innerHTML = '<div class="card back xl"></div><div class="card back xl"></div>';
+  }
+
+  // Yhteiskortit
+  const communityEl = document.getElementById('community-row');
+  const comm = d.community_cards || [];
+  let commHtml = '';
+  if(comm.length > 0){
+    for(let i=0;i<comm.length;i++) commHtml += renderCard(comm[i],'md');
+    for(let i=comm.length;i<5;i++) commHtml += renderEmptyCard('md');
+  } else if(d.status === 'active' && d.stage !== 'preflop'){
+    for(let i=0;i<5;i++) commHtml += renderEmptyCard('md');
+  } else {
+    commHtml = '<span style="color:rgba(255,255,255,.3);font-size:.85rem">Odotetaan floppia…</span>';
+  }
+  communityEl.innerHTML = commHtml;
+}
+
+// ── Näytä/piilota -toiminto ────────────────────────────────────────────────
+async function toggleShowCards(){
+  if(!token) return;
+  try{
+    const r = await fetch(`/api/poker/player/${token}/showcards`, {method:'POST'});
+    if(!r.ok) return;
+    const d = await r.json();
+    showingCards = !!d.show_cards;
+    updateShowBtn();
+  }catch(e){}
+}
+
+function updateShowBtn(){
+  const btn = document.getElementById('toggle-show-btn');
+  if(!btn) return;
+  if(showingCards){
+    btn.textContent = '👁 Kortit näkyvissä muille — napauta piilottaaksesi';
+    btn.className   = 'toggle-show-btn showing';
+  } else {
+    btn.textContent = '🙈 Kortit piilotettu — napauta näyttääksesi muille';
+    btn.className   = 'toggle-show-btn';
+  }
+}
+
+// ── Poistu pöydästä ────────────────────────────────────────────────────────
+function leaveTable(){
+  if(!confirm('Poistutko pöydästä? Sinut kirjataan ulos istuimelta.')) return;
+  clearInterval(pollId);
+  token = null;
+  localStorage.removeItem(LS_TOKEN);
+  show('screen-waiting');
+  setWaitStatus('Poistuit pöydästä. Odotetaan seuraavaa peliä…');
+  startWaiting();
+}
+
+// ── Näyttöjen vaihto ───────────────────────────────────────────────────────
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // Redraw wheel for visible canvas
+  if(id==='screen-waiting') drawWheel('wait');
+  if(id==='screen-game')    drawWheel('game');
+}
+
+// ── Kortit ─────────────────────────────────────────────────────────────────
+function renderCard(card, size='xl'){
+  if(!card||!card.rank) return `<div class="card back ${size}"></div>`;
+  const red = card.suit==='♥'||card.suit==='♦';
+  return `<div class="card ${red?'red':'black'} ${size}">
+    <div class="corner tl">${card.rank}<br>${card.suit}</div>
+    <div class="center">${card.suit}</div>
+    <div class="corner br">${card.rank}<br>${card.suit}</div>
+  </div>`;
+}
+function renderEmptyCard(size='md'){ return `<div class="card empty-slot ${size}"></div>`; }
+
+// ── VIP-merkki ─────────────────────────────────────────────────────────────
+function vipBadge(v){ return `<span class="vip vip-${v}">${v==='Whale'?'🐋 ':''}${v}</span>`; }
+
+// ── Bonuspyörä ─────────────────────────────────────────────────────────────
+const WHEEL_SEGS=[
+  {label:'10%',color:'#8b6914'},{label:'20%',color:'#888'},
+  {label:'10%',color:'#8b6914'},{label:'100%',color:'#7b2d8b'},
+  {label:'10%',color:'#8b6914'},{label:'50%',color:'#c9a84c'},
+  {label:'10%',color:'#8b6914'},{label:'20%',color:'#888'},
+];
+const PRIZE_SEGS = {0:[0,2,4,6],1:[1,7],2:[5],3:[3]};
+
+// Each wheel (wait / game) has its own rotation state
+const wheelState = {wait:{rot:0,spinning:false}, game:{rot:0,spinning:false}};
+
+function canvasId(which){ return which==='wait' ? 'wheel-canvas-wait' : 'wheel-canvas-game'; }
+
+function drawWheel(which, deg){
+  const cv = document.getElementById(canvasId(which));
+  if(!cv) return;
+  if(deg === undefined) deg = wheelState[which].rot;
+  const ctx=cv.getContext('2d'),cx=cv.width/2,cy=cv.height/2,R=cx-8;
+  const n=WHEEL_SEGS.length,arc=(2*Math.PI)/n,rot=deg*Math.PI/180;
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.beginPath();ctx.arc(cx,cy,R+4,0,2*Math.PI);ctx.strokeStyle='#c9a84c44';ctx.lineWidth=6;ctx.stroke();
+  WHEEL_SEGS.forEach((seg,i)=>{
+    const s=rot+i*arc-Math.PI/2,e=s+arc;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.arc(cx,cy,R,s,e);ctx.closePath();
+    ctx.fillStyle=seg.color;ctx.fill();ctx.strokeStyle='#0a1a10';ctx.lineWidth=2;ctx.stroke();
+    const mid=s+arc/2;
+    ctx.save();ctx.translate(cx+Math.cos(mid)*R*.64,cy+Math.sin(mid)*R*.64);ctx.rotate(mid+Math.PI/2);
+    ctx.fillStyle='#fff';ctx.font=`bold ${seg.label.length>3?11:13}px "DM Sans",sans-serif`;
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(seg.label,0,0);ctx.restore();
+  });
+  ctx.beginPath();ctx.arc(cx,cy,18,0,2*Math.PI);ctx.fillStyle='#0a1a10';ctx.fill();
+  ctx.strokeStyle='#c9a84c';ctx.lineWidth=2;ctx.stroke();
+  ctx.fillStyle='#c9a84c';ctx.font='bold 11px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('♠',cx,cy);
+}
+
+// Single spin key per player (shared between both wheels)
+function spinKey(){ return 'pp_spun_' + (player ? player.id : 'guest'); }
+function spinResultKey(){ return 'pp_spin_result_' + (player ? player.id : 'guest'); }
+
+async function doSpin(which){
+  const ws = wheelState[which];
+  if(ws.spinning) return;
+  const sk = spinKey(), rk = spinResultKey();
+
+  if(localStorage.getItem(sk)){
+    const saved = JSON.parse(localStorage.getItem(rk) || 'null');
+    if(saved) showPrize(which, saved);
+    document.getElementById(`spin-used-${which}`).style.display = 'block';
+    document.getElementById(`spin-btn-${which}`).disabled = true;
+    return;
+  }
+
+  ws.spinning = true;
+  document.getElementById(`spin-btn-${which}`).disabled = true;
+  document.getElementById(`prize-result-${which}`).style.display = 'none';
+
+  let result;
+  try{
+    const r = await fetch('/api/poker/spin',{method:'POST'});
+    result = await r.json();
+  }catch(e){
+    ws.spinning = false;
+    document.getElementById(`spin-btn-${which}`).disabled = false;
+    return;
+  }
+
+  const prizeIdx  = result.index;
+  const matchSegs = PRIZE_SEGS[prizeIdx];
+  const targetSeg = matchSegs[Math.floor(Math.random()*matchSegs.length)];
+  const segCenter = targetSeg*45+22.5;
+  const needed    = (360-segCenter)%360;
+  const curMod    = ((ws.rot%360)+360)%360;
+  let   delta     = (needed-curMod+360)%360;
+  if(delta<45) delta+=360;
+  const target    = ws.rot + delta + 5*360;
+  const startRot  = ws.rot, totalDist = target-startRot;
+  const dur=4200, t0=performance.now();
+
+  function frame(now){
+    const el=now-t0, prog=Math.min(el/dur,1);
+    const eased=1-Math.pow(1-prog,3);
+    ws.rot = startRot + totalDist*eased;
+    drawWheel(which, ws.rot);
+    if(prog < 1){
+      requestAnimationFrame(frame);
+    } else {
+      ws.spinning = false;
+      localStorage.setItem(sk, '1');
+      localStorage.setItem(rk, JSON.stringify(result.prize));
+      showPrize(which, result.prize);
+      document.getElementById(`spin-used-${which}`).style.display = 'block';
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function showPrize(which, prize){
+  const el   = document.getElementById(`prize-result-${which}`);
+  el.style.display = 'block';
+  el.className = 'prize-result won';
+  const emoji = prize.bonus===100?'🏆':prize.bonus>=50?'🎊':'🎉';
+  document.getElementById(`prize-emoji-${which}`).textContent = emoji;
+  document.getElementById(`prize-label-${which}`).textContent = prize.label;
+}
+
+// Restore spin state on boot for both wheels
+function restoreSpinState(which){
+  const sk = spinKey(), rk = spinResultKey();
+  if(localStorage.getItem(sk)){
+    const saved = JSON.parse(localStorage.getItem(rk)||'null');
+    if(saved) showPrize(which, saved);
+    document.getElementById(`spin-used-${which}`).style.display = 'block';
+    document.getElementById(`spin-btn-${which}`).disabled = true;
+  }
+}
+// Restore after player is known (called after login)
+function restoreSpinBoth(){ restoreSpinState('wait'); restoreSpinState('game'); }
+</script>
+</body>
+</html>
