@@ -195,6 +195,15 @@ select.form-control option{background:var(--bg2)}
 .preset-seat-row:last-child{border-bottom:none}
 .preset-seat-label{font-weight:600;font-size:.85rem;min-width:90px}
 .preset-cards-display{display:flex;gap:.3rem}
+.comm-slot{width:38px;height:54px;border-radius:5px;border:2px dashed rgba(255,255,255,.15);background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:.65rem;color:var(--muted);transition:border-color .15s}
+.comm-slot:hover,.comm-slot.active{border-color:var(--gold);color:var(--gold)}
+.comm-slot.active{box-shadow:0 0 8px rgba(201,168,76,.5)}
+
+/* ── Card flip animation (community reveal) ───────────────────────────────── */
+@keyframes flipIn{
+  from{transform:perspective(500px) rotateY(90deg) scale(.92);opacity:0}
+  to  {transform:perspective(500px) rotateY(0deg)  scale(1);  opacity:1}
+}
 
 /* ── Dash cols ────────────────────────────────────────────────────────────── */
 .dash-cols{display:grid;grid-template-columns:1fr 1fr;gap:1.1rem}
@@ -672,6 +681,25 @@ select.form-control option{background:var(--bg2)}
     </div>
     <div class="modal-body">
       <p class="text-muted text-sm" style="margin-bottom:1rem">Valitse enintään 2 korttia per pelaaja. Pelaajat joille ei ole asetettu kortteja saavat satunnaiset kortit.</p>
+      <!-- Community cards -->
+      <div style="margin-bottom:1.1rem">
+        <h3 style="font-family:'Playfair Display',serif;color:var(--gold);font-size:1rem;margin-bottom:.65rem">🂠 Yhteiskortit (ennalta)</h3>
+        <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap" id="comm-preset-row">
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Flop</div>
+            <div style="display:flex;gap:.3rem" id="comm-flop-slots"></div>
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">Turn</div>
+            <div id="comm-turn-slot"></div>
+          </div>
+          <div>
+            <div style="font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">River</div>
+            <div id="comm-river-slot"></div>
+          </div>
+        </div>
+      </div>
+
       <div id="preset-seats-list"></div>
       <hr class="divider">
       <h3 style="font-family:'Playfair Display',serif;color:var(--gold);font-size:1rem;margin-bottom:.75rem">Korttipakka</h3>
@@ -1021,10 +1049,13 @@ async function doGrantSpins(){
 }
 
 // ── Card renderer ──────────────────────────────────────────────────────────
-function renderCard(card,size='md'){
+function renderCard(card, size='md', animDelayMs=-1){
   if(!card||!card.rank) return `<div class="card back ${size}"></div>`;
-  const red=card.suit==='♥'||card.suit==='♦';
-  return `<div class="card ${red?'red':'black'} ${size}">
+  const red = card.suit==='♥'||card.suit==='♦';
+  const anim = animDelayMs >= 0
+    ? ` style="animation:flipIn .45s ${animDelayMs}ms ease both"`
+    : '';
+  return `<div class="card ${red?'red':'black'} ${size}"${anim}>
     <div class="corner tl"><div class="crank">${card.rank}</div><div class="csuit">${card.suit}</div></div>
     <div class="center">${card.suit}</div>
     <div class="corner br"><div class="crank">${card.rank}</div><div class="csuit">${card.suit}</div></div>
@@ -1032,6 +1063,8 @@ function renderCard(card,size='md'){
 }
 function renderEmpty(size='md'){return `<div class="card empty ${size}"></div>`;}
 function renderBack(size='md'){return `<div class="card back ${size}"></div>`;}
+
+let prevCommCount = 0;
 
 // ── Poker table ────────────────────────────────────────────────────────────
 const STAGES=['waiting','preflop','flop','turn','river','showdown'];
@@ -1067,13 +1100,19 @@ function renderPoker(d){
   $('poker-btns').innerHTML=btns;
 
   const comm=d.community_cards||[];
+  // Reset animation counter when hand resets to waiting
+  if(!d.status||d.status==='none'||d.status==='waiting'||stage==='waiting') prevCommCount=0;
   let ch='';
   if(comm.length>0){
-    for(let i=0;i<comm.length;i++) ch+=renderCard(comm[i],'md');
+    for(let i=0;i<comm.length;i++){
+      const delay = i >= prevCommCount ? (i - prevCommCount) * 420 : -1;
+      ch+=renderCard(comm[i],'md',delay);
+    }
     for(let i=comm.length;i<5;i++) ch+=renderEmpty('md');
   } else if(stage!=='waiting'&&d.status!=='none'&&d.status)
     for(let i=0;i<5;i++) ch+=renderEmpty('md');
   $('community-cards-display').innerHTML=ch||`<span style="opacity:.4;font-size:.8rem">Kortit ilmestyvät tähän</span>`;
+  prevCommCount=comm.length;
 
   const seats=(d.seats||[]).filter(s=>s.active);
   $('seat-count').textContent=seats.length?`${seats.length} pelaaja${seats.length!==1?'a':''} pöydässä`:'';
@@ -1150,11 +1189,31 @@ const ALL_CARDS=[];
 function openPresetModal(){
   if(!S.poker||!S.poker.seats)return;
   S.presets=JSON.parse(JSON.stringify(S.poker.preset_hands||{}));
+  if(!S.presets.community) S.presets.community=[null,null,null,null,null];
   S.activePick=null;
   renderPresetModal();
   openModal('modal-preset');
 }
+
+function renderCommSlot(idx){
+  const card=(S.presets.community||[])[idx];
+  const isActive=S.activePick==='c'+idx;
+  if(card){
+    const red=card.suit==='♥'||card.suit==='♦';
+    return `<div style="position:relative;cursor:pointer" onclick="selectCommSlot(${idx})">
+      ${renderCard(card,'sm')}
+      <button onclick="clearCommSlot(event,${idx})" style="position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--red2);border:none;color:#fff;font-size:.65rem;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+    </div>`;
+  }
+  return `<div class="comm-slot ${isActive?'active':''}" onclick="selectCommSlot(${idx})">${idx+1}</div>`;
+}
+
 function renderPresetModal(){
+  const comm=S.presets.community||[null,null,null,null,null];
+  $('comm-flop-slots').innerHTML=[0,1,2].map(i=>renderCommSlot(i)).join('');
+  $('comm-turn-slot').innerHTML=renderCommSlot(3);
+  $('comm-river-slot').innerHTML=renderCommSlot(4);
+
   const seats=(S.poker.seats||[]).filter(s=>s.active);
   $('preset-seats-list').innerHTML=seats.map(s=>{
     const cards=S.presets[s.id]||[];
@@ -1171,7 +1230,13 @@ function renderPresetModal(){
       </div>`;
   }).join('');
 
-  const usedKeys=new Set(Object.values(S.presets).flat().map(c=>c.rank+'|'+c.suit));
+  const usedKeys=new Set([
+    ...Object.entries(S.presets)
+      .filter(([k])=>k!=='community')
+      .flatMap(([,cards])=>cards||[])
+      .map(c=>c.rank+'|'+c.suit),
+    ...(S.presets.community||[]).filter(Boolean).map(c=>c.rank+'|'+c.suit),
+  ]);
   $('card-picker-grid').innerHTML=ALL_CARDS.map(c=>{
     const red=c.suit==='♥'||c.suit==='♦';
     const key=c.rank+'|'+c.suit;
@@ -1181,24 +1246,59 @@ function renderPresetModal(){
     </div>`;
   }).join('');
 
-  $('active-preset-seat').textContent=S.activePick
-    ?`Valittu paikka: ${(S.poker.seats||[]).find(s=>s.id===S.activePick)?.player_name||S.activePick}`
-    :'Valitse ensin paikka yllä.';
+  let activeLabel='Valitse paikka tai yhteiskorttislotti yllä.';
+  if(typeof S.activePick==='number')
+    activeLabel=`Valittu pelaaja: ${(S.poker.seats||[]).find(s=>s.id===S.activePick)?.player_name||S.activePick}`;
+  else if(typeof S.activePick==='string'&&S.activePick.startsWith('c')){
+    const labels=['Flop 1','Flop 2','Flop 3','Turn','River'];
+    activeLabel=`Valittu yhteiskortti: ${labels[+S.activePick[1]]}`;
+  }
+  $('active-preset-seat').textContent=activeLabel;
 }
+
 function selectPresetSeat(id){S.activePick=id;renderPresetModal();}
-function pickCard(card){
-  if(!S.activePick){toast('Valitse ensin paikka.','error');return;}
-  const existing=S.presets[S.activePick]||[];
-  if(existing.length>=2){toast('Paikalla on jo 2 korttia. Tyhjennä ensin.','error');return;}
-  S.presets[S.activePick]=[...existing,card];
-  if((S.presets[S.activePick]||[]).length>=2) S.activePick=null;
+function selectCommSlot(idx){S.activePick='c'+idx;renderPresetModal();}
+function clearCommSlot(e,idx){
+  e.stopPropagation();
+  if(S.presets.community) S.presets.community[idx]=null;
+  if(S.activePick==='c'+idx) S.activePick=null;
   renderPresetModal();
 }
+
+function pickCard(card){
+  if(S.activePick===null||S.activePick===undefined){toast('Valitse ensin paikka.','error');return;}
+  if(typeof S.activePick==='string'&&S.activePick.startsWith('c')){
+    const idx=+S.activePick[1];
+    if(!S.presets.community) S.presets.community=[null,null,null,null,null];
+    S.presets.community[idx]=card;
+    // Auto-advance to next empty community slot
+    const next=[0,1,2,3,4].find(i=>i>idx&&!S.presets.community[i]);
+    S.activePick=next!=null?'c'+next:null;
+  } else {
+    const existing=S.presets[S.activePick]||[];
+    if(existing.length>=2){toast('Paikalla on jo 2 korttia. Tyhjennä ensin.','error');return;}
+    S.presets[S.activePick]=[...existing,card];
+    if((S.presets[S.activePick]||[]).length>=2) S.activePick=null;
+  }
+  renderPresetModal();
+}
+
 function clearSeatPreset(id){delete S.presets[id];renderPresetModal();}
-function clearPresets(){S.presets={};renderPresetModal();}
+function clearPresets(){
+  const comm=S.presets.community;
+  S.presets={community:comm||[null,null,null,null,null]};
+  renderPresetModal();
+}
 async function savePresets(){
   const payload={};
-  Object.entries(S.presets).forEach(([id,cards])=>{if(cards.length===2)payload[id]=cards;});
+  Object.entries(S.presets).forEach(([id,cards])=>{
+    if(id==='community'){
+      const filled=cards.filter(Boolean);
+      if(filled.length) payload['community']=cards;
+    } else if(Array.isArray(cards)&&cards.length===2){
+      payload[id]=cards;
+    }
+  });
   try{
     await api('POST','/api/poker/preset',payload);
     toast('Ennalta asetetut kädet tallennettu.','success');

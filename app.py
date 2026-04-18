@@ -583,7 +583,7 @@ def poker_deal():
     if not seats:
         return jsonify({'error': 'Ei pelaajia pöydässä.'}), 400
 
-    used = {(c['rank'], c['suit']) for cards in presets.values() for c in cards}
+    used = {(c['rank'], c['suit']) for cards in presets.values() for c in cards if isinstance(cards, list)}
     deck = [c for c in deck if (c['rank'], c['suit']) not in used]
     if len(deck) < len(seats) * 2 + 5:
         full = new_deck()
@@ -598,9 +598,12 @@ def poker_deal():
         db.execute('UPDATE poker_seats SET hole_cards_json=?,folded=0 WHERE id=?',
                    (json.dumps(cards), seat['id']))
 
+    # Preserve community presets across deal; clear only player hole-card presets
+    comm_preset = presets.get('community', [])
+    new_presets = {'community': comm_preset} if comm_preset else {}
     db.execute(
         'UPDATE poker_sessions SET deck_json=?,stage=?,status=?,community_cards_json=?,preset_hands_json=? WHERE id=?',
-        (json.dumps(deck), 'preflop', 'active', '[]', '{}', sess['id'])
+        (json.dumps(deck), 'preflop', 'active', '[]', json.dumps(new_presets), sess['id'])
     )
     db.commit()
     return jsonify({'ok': True, 'stage': 'preflop'})
@@ -626,12 +629,18 @@ def poker_advance():
     deck      = json.loads(sess['deck_json'])
     community = json.loads(sess['community_cards_json'])
     stage     = sess['stage']
+    comm_pre  = json.loads(sess.get('preset_hands_json') or '{}').get('community', [])
+    def _cc(idx):
+        """Return preset community card at index, or pop from deck."""
+        if idx < len(comm_pre) and comm_pre[idx]:
+            return comm_pre[idx]
+        return deck.pop()
     if stage == 'preflop':
-        community = [deck.pop(), deck.pop(), deck.pop()]; new_stage = 'flop'
+        community = [_cc(0), _cc(1), _cc(2)]; new_stage = 'flop'
     elif stage == 'flop':
-        community.append(deck.pop()); new_stage = 'turn'
+        community.append(_cc(3)); new_stage = 'turn'
     elif stage == 'turn':
-        community.append(deck.pop()); new_stage = 'river'
+        community.append(_cc(4)); new_stage = 'river'
     elif stage == 'river':
         new_stage = 'showdown'
     else:
