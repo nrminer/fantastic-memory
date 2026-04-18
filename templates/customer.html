@@ -2,8 +2,14 @@
 <html lang="fi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0a1a10">
+<!-- iOS standalone (hides Safari address bar when added to home screen) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Kasino">
+<!-- Android PWA manifest (hides Chrome address bar) -->
+<link rel="manifest" href="/manifest.json">
 <title>Asiakassivu · Kasino</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -23,6 +29,8 @@ header{
   width:100%;background:var(--bg2);border-bottom:1px solid var(--border);
   padding:.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;
   flex-shrink:0;position:sticky;top:0;z-index:50;
+  /* push content below status bar when in standalone mode */
+  padding-top:calc(.9rem + env(safe-area-inset-top));
 }
 .brand{font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--gold);display:flex;align-items:center;gap:.4rem}
 .stage-badge{padding:.3rem .8rem;border-radius:20px;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;border:1px solid var(--border);color:var(--muted)}

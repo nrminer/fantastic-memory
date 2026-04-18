@@ -232,6 +232,24 @@ def poker_join_page():
 def customer_page():
     return render_template('customer.html', local_ip=get_local_ip())
 
+@app.route('/manifest.json')
+def pwa_manifest():
+    from flask import Response
+    manifest = {
+        "name": "Kasino",
+        "short_name": "Kasino",
+        "start_url": "/asiakas",
+        "display": "standalone",
+        "background_color": "#0a1a10",
+        "theme_color": "#0a1a10",
+        "orientation": "portrait",
+        "icons": [
+            {"src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%230a1a10'/><text y='.9em' font-size='80' x='10'>♠</text></svg>",
+             "sizes": "any", "type": "image/svg+xml"}
+        ]
+    }
+    return Response(json.dumps(manifest), mimetype='application/manifest+json')
+
 # ─── Players API ─────────────────────────────────────────────────────────────
 
 @app.route('/api/players', methods=['GET'])
