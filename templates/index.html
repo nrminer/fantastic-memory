@@ -293,6 +293,7 @@ select.form-control option{background:var(--bg2)}
       <li class="active" data-view="dashboard"><span class="nav-icon">📊</span> Kojelauta</li>
       <li data-view="players"><span class="nav-icon">👥</span> Pelaajat</li>
       <li data-view="poker"><span class="nav-icon">♠</span> Pokeripöytä</li>
+      <li data-view="settings"><span class="nav-icon">⚙️</span> Asetukset</li>
     </ul>
   </nav>
   <div class="sidebar-footer">v2.1 · Paikallinen · SQLite</div>
@@ -355,6 +356,8 @@ select.form-control option{background:var(--bg2)}
           <th class="col-hide-sm">Puhelin</th>
           <th>Saldo</th>
           <th class="col-hide-sm">Hävitty</th>
+          <th>Pisteet</th>
+          <th>Putki</th>
           <th class="col-hide-sm">Tapahtumat</th>
           <th></th>
         </tr></thead>
@@ -414,6 +417,41 @@ select.form-control option{background:var(--bg2)}
         <button class="btn btn-ghost btn-sm" onclick="$('hand-results').style.display='none'">✕ Sulje</button>
       </div>
       <div class="panel-body" id="hand-results-body"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ ASETUKSET ═══ -->
+<section id="view-settings" class="view">
+  <div class="page-header">
+    <h1>Asetukset</h1>
+    <button class="btn btn-ghost btn-sm" onclick="loadSettings()">↻ Lataa</button>
+  </div>
+  <div class="panel" style="max-width:640px">
+    <div class="panel-header"><h3>🪙 Pistejärjestelmä</h3></div>
+    <div class="panel-body">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Pisteitä per €1</label>
+          <input class="form-control" id="s-ppu" type="number" step="1" min="1" placeholder="10">
+          <span class="hint">Esim. 10 → 100 pistettä = €10</span>
+        </div>
+        <div class="form-group">
+          <label>Vähimmäislunastus (pistettä)</label>
+          <input class="form-control" id="s-min" type="number" step="100" min="0" placeholder="500">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Enimmäislunastus per kerta (pistettä)</label>
+          <input class="form-control" id="s-max" type="number" step="100" min="0" placeholder="5000">
+        </div>
+        <div class="form-group">
+          <label>Pisteiden vanheneminen (päivää)</label>
+          <input class="form-control" id="s-exp" type="number" step="1" min="0" placeholder="365">
+        </div>
+      </div>
+      <button class="btn btn-gold" onclick="saveSettings()">💾 Tallenna asetukset</button>
     </div>
   </div>
 </section>
@@ -599,6 +637,32 @@ select.form-control option{background:var(--bg2)}
   </div>
 </div>
 
+<!-- ═══ MODAL: Anna/vähennä pisteitä ═══ -->
+<div class="modal-overlay" id="modal-grant-points">
+  <div class="modal-box" style="width:min(420px,96vw)">
+    <div class="modal-head">
+      <h2>🪙 Hallinnoi pisteitä</h2>
+      <button class="modal-close" onclick="closeModal('modal-grant-points')">×</button>
+    </div>
+    <div class="modal-body">
+      <p id="grant-pts-player-label" style="color:var(--muted);font-size:.9rem;margin-bottom:.75rem"></p>
+      <p style="font-size:.82rem;margin-bottom:1rem">Pisteet nyt: <strong id="grant-pts-current">0</strong></p>
+      <div class="form-group">
+        <label>Määrä (negatiivinen = vähennys)</label>
+        <input class="form-control" id="grant-pts-count" type="number" step="1" placeholder="esim. 500 tai -200">
+      </div>
+      <div class="form-group">
+        <label>Syy (kirjataan lokiin)</label>
+        <input class="form-control" id="grant-pts-reason" placeholder="esim. Tervetuliaisbonus" maxlength="120">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-grant-points')">Peruuta</button>
+      <button class="btn btn-gold" onclick="doGrantPoints()">Tallenna →</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ MODAL: Ennalta asetetut kädet ═══ -->
 <div class="modal-overlay" id="modal-preset">
   <div class="modal-box" style="width:min(800px,96vw)">
@@ -632,6 +696,7 @@ let S = {
   detailPlayerId: null, pokerInterval: null,
   giveBonusPlayerId: null,
   grantSpinsPlayerId: null,
+  grantPointsPlayerId: null,
   presets: {}, activePick: null,
 };
 
@@ -675,6 +740,7 @@ function showView(name){
   closeSidebar();
   if(name==='dashboard') loadDashboard();
   if(name==='players')   loadPlayers();
+  if(name==='settings')  loadSettings();
   if(name==='poker'){
     loadPoker();
     if(!S.pokerInterval) S.pokerInterval=setInterval(loadPoker,3000);
@@ -742,7 +808,14 @@ function renderPlayers(list){
   const tbody=$('players-tbody'), empty=$('players-empty');
   if(!list.length){tbody.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
-  tbody.innerHTML=list.map(p=>`
+  const streakMeta = {
+    normal: {icon:'🎲', cls:'btn-ghost',   label:'Normaali'},
+    win:    {icon:'🏆', cls:'btn-green',   label:'Voittoputki'},
+    lose:   {icon:'💸', cls:'btn-red',     label:'Häviöputki'},
+  };
+  tbody.innerHTML=list.map(p=>{
+    const sm = streakMeta[p.streak_mode||'normal'] || streakMeta.normal;
+    return `
     <tr>
       <td><span class="bold">${esc(p.name)}</span></td>
       <td>${vipBadge(p.vip_level)}</td>
@@ -750,6 +823,12 @@ function renderPlayers(list){
       <td class="text-muted text-sm col-hide-sm">${esc(p.phone||'—')}</td>
       <td class="${p.net_balance<=0?'c-green':'c-red'} bold">€${Math.abs(p.net_balance).toFixed(2)}</td>
       <td class="c-green text-sm col-hide-sm">€${(p.total_lost||0).toFixed(2)}</td>
+      <td>
+        <button class="btn btn-purple btn-sm" title="Pisteet: ${p.points||0}" onclick="openGrantPointsModal(${p.id},'${esc(p.name)}',${p.points||0})">🪙 ${p.points||0}</button>
+      </td>
+      <td>
+        <button class="btn ${sm.cls} btn-sm" title="${sm.label} — klikkaa vaihtaaksesi" onclick="cycleStreak(${p.id},'${p.streak_mode||'normal'}')">${sm.icon} ${sm.label}</button>
+      </td>
       <td class="text-muted text-sm col-hide-sm">${p.tx_count}</td>
       <td>
         <div class="flex flex-wrap" style="gap:.3rem">
@@ -760,7 +839,8 @@ function renderPlayers(list){
           <button class="btn btn-red btn-sm" onclick="deletePlayer(${p.id},'${esc(p.name)}')">✕</button>
         </div>
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 function openAddModal(){
   $('modal-player-title').textContent='Lisää pelaaja';
@@ -1124,6 +1204,66 @@ async function savePresets(){
     toast('Ennalta asetetut kädet tallennettu.','success');
     closeModal('modal-preset');loadPoker();
   }catch(e){toast(e.message,'error');}
+}
+
+// ── Streak mode ────────────────────────────────────────────────────────────
+const STREAK_CYCLE = {normal:'win', win:'lose', lose:'normal'};
+async function cycleStreak(pid, current){
+  const next = STREAK_CYCLE[current] || 'normal';
+  try{
+    await api('POST',`/api/players/${pid}/streak`,{mode:next});
+    const labels = {normal:'Normaali 🎲', win:'Voittoputki 🏆', lose:'Häviöputki 💸'};
+    toast(`Putki vaihdettu: ${labels[next]}`,'success');
+    loadPlayers();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ── Grant points ────────────────────────────────────────────────────────────
+function openGrantPointsModal(pid, name, currentPts){
+  S.grantPointsPlayerId = pid;
+  $('grant-pts-player-label').textContent = `Pelaaja: ${name}`;
+  $('grant-pts-current').textContent = currentPts || 0;
+  $('grant-pts-count').value = '';
+  $('grant-pts-reason').value = '';
+  openModal('modal-grant-points');
+  setTimeout(()=>$('grant-pts-count').focus(),50);
+}
+async function doGrantPoints(){
+  const pid   = S.grantPointsPlayerId;
+  const count = parseInt($('grant-pts-count').value, 10);
+  const reason= $('grant-pts-reason').value.trim();
+  if(!pid){ toast('Ei valittua pelaajaa.','error'); return; }
+  if(!Number.isFinite(count)||count===0){ toast('Syötä määrä (ei 0).','error'); return; }
+  try{
+    const r = await api('POST',`/api/players/${pid}/points/grant`,{count,reason:reason||undefined});
+    closeModal('modal-grant-points');
+    const verb = count > 0 ? 'Lisätty' : 'Vähennetty';
+    toast(`${verb} ${Math.abs(count)} pistettä · saldo ${r.points}`,'success');
+    loadPlayers();
+  }catch(e){ toast(e.message,'error'); }
+}
+
+// ── System settings ─────────────────────────────────────────────────────────
+async function loadSettings(){
+  try{
+    const d = await api('GET','/api/settings');
+    $('s-ppu').value = d.points_per_eur || 10;
+    $('s-min').value = d.min_redeem_pts || 500;
+    $('s-max').value = d.max_redeem_pts || 5000;
+    $('s-exp').value = d.point_expiry_days || 365;
+  }catch(e){ toast(e.message,'error'); }
+}
+async function saveSettings(){
+  const body = {
+    points_per_eur:    $('s-ppu').value,
+    min_redeem_pts:    $('s-min').value,
+    max_redeem_pts:    $('s-max').value,
+    point_expiry_days: $('s-exp').value,
+  };
+  try{
+    await api('PUT','/api/settings',body);
+    toast('Asetukset tallennettu.','success');
+  }catch(e){ toast(e.message,'error'); }
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────

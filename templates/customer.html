@@ -202,6 +202,51 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
 .spins-badge .num{font-size:1.15rem;color:var(--gold2)}
 .no-spins-msg{background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);color:#e74c3c;font-size:.85rem;padding:.7rem;border-radius:8px;text-align:center;width:100%}
 
+/* ── Points & games panel ─────────────────────────────────────────────────── */
+.points-hero{background:linear-gradient(135deg,var(--bg3),var(--bg4));border:1px solid rgba(201,168,76,.3);border-radius:14px;padding:1.25rem;width:100%;text-align:center;margin-bottom:.5rem}
+.points-big{font-size:2.6rem;font-weight:700;color:var(--gold2);line-height:1}
+.points-eur{font-size:.95rem;color:var(--muted);margin-top:.25rem}
+.pts-input-row{display:flex;gap:.5rem;align-items:center;margin-top:.75rem}
+.pts-input-row input{flex:1;padding:.65rem .9rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--cream);font-size:.95rem;-webkit-appearance:none}
+.pts-input-row input:focus{outline:none;border-color:var(--gold)}
+.pts-input-row button{padding:.65rem 1rem;background:var(--gold);color:#0a1a10;border:none;border-radius:8px;font-weight:700;font-size:.9rem;cursor:pointer;white-space:nowrap;min-height:42px}
+.pts-input-row button:disabled{opacity:.45;cursor:not-allowed}
+.redeem-hint{font-size:.78rem;color:var(--muted);margin-top:.4rem}
+.game-tabs-bar{display:flex;gap:.3rem;overflow-x:auto;padding-bottom:.1rem;margin-bottom:.85rem;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.game-tabs-bar::-webkit-scrollbar{display:none}
+.gtab-btn{flex-shrink:0;padding:.5rem .85rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap}
+.gtab-btn.active{background:rgba(201,168,76,.12);border-color:var(--gold);color:var(--gold)}
+.game-panel{display:none}
+.game-panel.active{display:block}
+.bet-row{display:flex;gap:.5rem;align-items:center;margin-bottom:.85rem;flex-wrap:wrap}
+.bet-row label{font-size:.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap}
+.bet-inp{width:120px;padding:.55rem .8rem;background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--cream);font-size:.95rem;-webkit-appearance:none}
+.bet-inp:focus{outline:none;border-color:var(--gold)}
+.choice-row{display:flex;gap:.5rem;margin-bottom:.75rem;flex-wrap:wrap}
+.choice-btn{flex:1;min-width:80px;padding:.65rem .5rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--muted);font-size:.9rem;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+.choice-btn.selected{border-color:var(--gold);background:rgba(201,168,76,.15);color:var(--gold2)}
+.game-result{border-radius:10px;padding:1rem;text-align:center;margin-top:.75rem}
+.game-result.win{background:rgba(39,174,96,.1);border:1px solid rgba(39,174,96,.3)}
+.game-result.loss{background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.3)}
+.game-result.push{background:rgba(201,168,76,.1);border:1px solid rgba(201,168,76,.25)}
+.res-emoji{font-size:1.8rem;margin-bottom:.2rem}
+.res-outcome{font-size:1.1rem;font-weight:700;margin-bottom:.2rem}
+.res-detail{font-size:.82rem;color:var(--muted)}
+.res-pts{font-size:1rem;font-weight:700;color:var(--gold2);margin-top:.3rem}
+.mini-cards{display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap;margin:.5rem 0}
+.bj-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+.bj-actions button{flex:1;min-width:80px;padding:.7rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--cream);font-weight:700;font-size:.9rem;cursor:pointer;transition:all .15s}
+.bj-actions button:hover:not(:disabled){border-color:var(--gold);color:var(--gold)}
+.bj-actions button:disabled{opacity:.35;cursor:not-allowed}
+.pika-hand{display:flex;gap:.4rem;justify-content:center;flex-wrap:wrap;margin:.6rem 0}
+.pika-card-wrap{display:flex;flex-direction:column;align-items:center;gap:.3rem;cursor:pointer}
+.pika-card-wrap .hold-label{font-size:.68rem;font-weight:700;color:var(--gold);letter-spacing:.05em;text-transform:uppercase;opacity:0;transition:opacity .15s}
+.pika-card-wrap.held .hold-label{opacity:1}
+.pika-card-wrap.held .card{box-shadow:0 0 0 3px var(--gold),0 4px 20px rgba(0,0,0,.7)}
+.pika-payouts{font-size:.72rem;color:var(--muted);width:100%;border-collapse:collapse;margin-top:.5rem}
+.pika-payouts td{padding:.2rem .4rem}
+.pika-payouts tr:nth-child(even){background:rgba(255,255,255,.03)}
+
 /* ── Claimed notification ─────────────────────────────────────────────────── */
 .claim-banner{
   position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-40px);
@@ -282,10 +327,11 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
     <button class="btn-secondary" onclick="logout()">Kirjaudu ulos</button>
   </div>
 
-  <!-- Päätabit: Peli · Bonukset · Tilastot -->
+  <!-- Päätabit: Peli · Bonukset · Pisteet · Tilastot -->
   <div class="main-tab-bar">
     <button class="main-tab-btn active" id="mtab-game"   onclick="switchMainTab('game')">🎲 Peli</button>
     <button class="main-tab-btn"        id="mtab-bonus"  onclick="switchMainTab('bonus')">🎁 Bonukset</button>
+    <button class="main-tab-btn"        id="mtab-points" onclick="switchMainTab('points')">🪙 Pisteet</button>
     <button class="main-tab-btn"        id="mtab-stats"  onclick="switchMainTab('stats')">📊 Tilastot</button>
   </div>
 
@@ -349,6 +395,145 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
     </div>
 
   </div><!-- /mpanel-bonus -->
+
+  <!-- ═══ Pisteet & Pelit -paneeli ═══ -->
+  <div class="main-panel" id="mpanel-points">
+
+    <!-- Pistesaldo -->
+    <div class="section-box" style="width:100%">
+      <div class="section-title">🪙 Pistetilisi</div>
+      <div class="points-hero">
+        <div class="points-big" id="pts-balance-big">0</div>
+        <div class="points-eur" id="pts-eur-display">≈ €0.00</div>
+      </div>
+
+      <!-- Käteislunastus -->
+      <div style="margin-top:.85rem">
+        <div class="section-label">Lunasta pisteet käteiseksi</div>
+        <div class="pts-input-row">
+          <input type="number" id="redeem-pts-inp" placeholder="Pisteiden määrä" min="1" step="100">
+          <button id="redeem-pts-btn" onclick="doCashRedeem()">Lunasta →</button>
+        </div>
+        <div class="redeem-hint" id="redeem-hint">Minimi: ladataan… · 100 pistettä = €10.00</div>
+        <div class="err-msg" id="redeem-err" style="margin-top:.3rem"></div>
+      </div>
+    </div>
+
+    <!-- Pelit -->
+    <div class="section-box" style="width:100%">
+      <div class="section-title">🎮 Pelit</div>
+
+      <!-- Pelitabit -->
+      <div class="game-tabs-bar" id="game-tabs-bar">
+        <button class="gtab-btn active" onclick="switchGameTab('coinflip')">🪙 Kolikon-heitto</button>
+        <button class="gtab-btn" onclick="switchGameTab('war')">⚔️ WAR</button>
+        <button class="gtab-btn" onclick="switchGameTab('baccarat')">🎴 Baccarat</button>
+        <button class="gtab-btn" onclick="switchGameTab('blackjack')">🃏 Blackjack</button>
+        <button class="gtab-btn" onclick="switchGameTab('pikapokeri')">♠ Pikapokeri</button>
+      </div>
+
+      <!-- Kolikonheitto -->
+      <div class="game-panel active" id="gpanel-coinflip">
+        <div class="bet-row">
+          <label>Panos (pistettä)</label>
+          <input class="bet-inp" type="number" id="cf-bet" value="100" min="10" max="10000" step="10">
+        </div>
+        <div class="choice-row">
+          <button class="choice-btn selected" id="cf-heads" onclick="cfChoose('heads')">👑 Kruuna</button>
+          <button class="choice-btn" id="cf-tails" onclick="cfChoose('tails')">🦅 Klaava</button>
+        </div>
+        <button class="btn-primary" id="cf-btn" onclick="doCoinflip()" style="margin-top:.3rem">Heitä kolikko</button>
+        <div id="cf-result"></div>
+      </div>
+
+      <!-- WAR -->
+      <div class="game-panel" id="gpanel-war">
+        <div class="bet-row">
+          <label>Panos (pistettä)</label>
+          <input class="bet-inp" type="number" id="war-bet" value="100" min="10" max="10000" step="10">
+        </div>
+        <p style="font-size:.83rem;color:var(--muted);margin-bottom:.75rem">Sinun korttisi vastaan jakajan kortti. Korkein kortti voittaa (Ässä korkein). Tasapelissä saat panoksen takaisin.</p>
+        <button class="btn-primary" id="war-btn" onclick="doWar()">Pelaa WAR</button>
+        <div id="war-result"></div>
+      </div>
+
+      <!-- Baccarat -->
+      <div class="game-panel" id="gpanel-baccarat">
+        <div class="bet-row">
+          <label>Panos (pistettä)</label>
+          <input class="bet-inp" type="number" id="bac-bet" value="100" min="10" max="10000" step="10">
+        </div>
+        <div class="choice-row">
+          <button class="choice-btn selected" id="bac-player" onclick="bacChoose('player')">👤 Pelaaja (1:1)</button>
+          <button class="choice-btn" id="bac-banker" onclick="bacChoose('banker')">🏦 Bankeri (0.95:1)</button>
+          <button class="choice-btn" id="bac-tie" onclick="bacChoose('tie')">🤝 Tasapeli (8:1)</button>
+        </div>
+        <button class="btn-primary" id="bac-btn" onclick="doBaccarat()">Pelaa Baccarat</button>
+        <div id="bac-result"></div>
+      </div>
+
+      <!-- Blackjack -->
+      <div class="game-panel" id="gpanel-blackjack">
+        <div id="bj-start-area">
+          <div class="bet-row">
+            <label>Panos (pistettä)</label>
+            <input class="bet-inp" type="number" id="bj-bet" value="100" min="10" max="10000" step="10">
+          </div>
+          <button class="btn-primary" id="bj-start-btn" onclick="doBlackjackStart()">Aloita peli</button>
+        </div>
+        <div id="bj-game-area" style="display:none">
+          <div style="margin-bottom:.5rem">
+            <div class="section-label" style="margin-bottom:.3rem">Jakajan käsi</div>
+            <div class="mini-cards" id="bj-dealer-cards"></div>
+            <div style="text-align:center;font-size:.82rem;color:var(--muted)" id="bj-dealer-total"></div>
+          </div>
+          <div style="margin-bottom:.5rem">
+            <div class="section-label" style="margin-bottom:.3rem">Sinun kätesi</div>
+            <div class="mini-cards" id="bj-player-cards"></div>
+            <div style="text-align:center;font-size:.9rem;font-weight:700;color:var(--gold2)" id="bj-player-total"></div>
+          </div>
+          <div class="bj-actions">
+            <button id="bj-hit" onclick="doBlackjackAction('hit')">🃏 Ota kortti</button>
+            <button id="bj-stand" onclick="doBlackjackAction('stand')">🛑 Jää</button>
+            <button id="bj-double" onclick="doBlackjackAction('double')">✌️ Tuplaa</button>
+          </div>
+          <div id="bj-result"></div>
+          <button class="btn-secondary" id="bj-new-btn" onclick="bjReset()" style="display:none;margin-top:.75rem;width:100%">Uusi peli</button>
+        </div>
+      </div>
+
+      <!-- Pikapokeri -->
+      <div class="game-panel" id="gpanel-pikapokeri">
+        <div id="pika-start-area">
+          <div class="bet-row">
+            <label>Panos (pistettä)</label>
+            <input class="bet-inp" type="number" id="pika-bet" value="100" min="10" max="10000" step="10">
+          </div>
+          <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Jacks-or-Better pokeri. Valitse pidettävät kortit ja nosta uudet.</p>
+          <table class="pika-payouts">
+            <tr><td>Royal Flush</td><td style="text-align:right;color:var(--gold2)">800×</td></tr>
+            <tr><td>Värisuora</td><td style="text-align:right;color:var(--gold2)">50×</td></tr>
+            <tr><td>Nelikko</td><td style="text-align:right;color:var(--gold2)">25×</td></tr>
+            <tr><td>Full House</td><td style="text-align:right;color:var(--gold2)">9×</td></tr>
+            <tr><td>Väri</td><td style="text-align:right;color:var(--gold2)">6×</td></tr>
+            <tr><td>Suora</td><td style="text-align:right;color:var(--gold2)">4×</td></tr>
+            <tr><td>Kolmikko</td><td style="text-align:right;color:var(--gold2)">3×</td></tr>
+            <tr><td>Kaksi paria</td><td style="text-align:right;color:var(--gold2)">2×</td></tr>
+            <tr><td>Pari (J tai parempi)</td><td style="text-align:right;color:var(--gold2)">1×</td></tr>
+          </table>
+          <button class="btn-primary" id="pika-deal-btn" onclick="doPikaDeal()" style="margin-top:.75rem">Jaa kortit</button>
+        </div>
+        <div id="pika-game-area" style="display:none">
+          <div class="section-label" style="margin-bottom:.3rem">Valitse pidettävät kortit — klikkaa korttia</div>
+          <div class="pika-hand" id="pika-hand"></div>
+          <button class="btn-primary" id="pika-draw-btn" onclick="doPikaDraw()">Nosta uudet kortit</button>
+          <div id="pika-result"></div>
+          <button class="btn-secondary" id="pika-new-btn" onclick="pikaReset()" style="display:none;margin-top:.75rem;width:100%">Uusi peli</button>
+        </div>
+      </div>
+
+    </div><!-- section-box games -->
+  </div><!-- mpanel-points -->
 
   <!-- ═══ Tilastot-paneeli ═══ -->
   <div class="main-panel" id="mpanel-stats">
@@ -490,14 +675,12 @@ function renderMainScreen(){
 }
 
 function switchMainTab(which){
-  ['game','bonus','stats'].forEach(id=>{
+  ['game','bonus','points','stats'].forEach(id=>{
     $('mtab-'+id).classList.toggle('active', id===which);
     $('mpanel-'+id).classList.toggle('active', id===which);
   });
-  if(which==='bonus'){
-    // Canvas was hidden; redraw so the wheel appears
-    requestAnimationFrame(()=>drawWheel(wheelRot));
-  }
+  if(which==='bonus') requestAnimationFrame(()=>drawWheel(wheelRot));
+  if(which==='points') pollPoints();
 }
 
 function updateSpinsUI(count){
@@ -577,6 +760,8 @@ async function pollGame(){
     await pollTransactions();
     // Poll spins remaining (staff can grant/revoke any time)
     await pollSpins();
+    // Poll points balance (staff can grant/deduct any time)
+    await pollPoints();
     // If in game, poll own card state
     if(token){
       const r=await fetch(`/api/poker/player/${token}`);
@@ -895,6 +1080,338 @@ function showSpinResult(prize){
   const emoji=prize.bonus===100?'🏆':prize.bonus>=50?'🎊':'🎉';
   $('spin-emoji').textContent=emoji;
   $('spin-prize-label').textContent=prize.label;
+}
+
+// ── Points & redemption ────────────────────────────────────────────────────
+let systemSettings = {points_per_eur:10, min_redeem_pts:500, max_redeem_pts:5000};
+
+async function pollPoints(){
+  if(!player) return;
+  try{
+    const [ptData, sett] = await Promise.all([
+      fetch(`/api/players/${player.id}/points`).then(r=>r.json()),
+      fetch('/api/settings').then(r=>r.json()),
+    ]);
+    systemSettings = sett;
+    const pts  = ptData.points || 0;
+    const ppu  = parseFloat(sett.points_per_eur) || 10;
+    const eur  = (pts / ppu).toFixed(2);
+    player.points = pts;
+    $('pts-balance-big').textContent = pts.toLocaleString('fi-FI');
+    $('pts-eur-display').textContent = `≈ €${eur}`;
+    const minPts = parseInt(sett.min_redeem_pts)||500;
+    const maxPts = parseInt(sett.max_redeem_pts)||5000;
+    $('redeem-hint').textContent = `Minimi: ${minPts} p · Maksimi: ${maxPts} p · ${Math.round(ppu*10)} p = €10.00`;
+  }catch(e){}
+}
+
+async function doCashRedeem(){
+  if(!player) return;
+  const pts = parseInt($('redeem-pts-inp').value,10);
+  $('redeem-err').textContent='';
+  const btn=$('redeem-pts-btn'); btn.disabled=true;
+  try{
+    const r = await fetch(`/api/players/${player.id}/points/cash-redeem`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({points: pts})
+    });
+    const d = await r.json();
+    if(!r.ok){ $('redeem-err').textContent = d.error||'Lunastus epäonnistui.'; return; }
+    $('redeem-pts-inp').value='';
+    showClaimBanner(d.eur, `Pisteistä lunastettu: ${pts} pistettä`);
+    pollPoints();
+    pollBonuses();
+  }catch(e){ $('redeem-err').textContent='Yhteysvirhe.'; }
+  finally{ btn.disabled=false; }
+}
+
+// ── Game helpers ────────────────────────────────────────────────────────────
+function switchGameTab(which){
+  const tabs = ['coinflip','war','baccarat','blackjack','pikapokeri'];
+  const btns = $('game-tabs-bar').querySelectorAll('.gtab-btn');
+  tabs.forEach((t,i)=>{
+    const panel=$('gpanel-'+t);
+    const isActive = t===which;
+    panel.classList.toggle('active', isActive);
+    btns[i].classList.toggle('active', isActive);
+  });
+}
+
+function renderMiniCard(card, size='sm'){
+  if(!card||!card.rank) return `<div class="card back ${size}"></div>`;
+  const red = card.suit==='♥'||card.suit==='♦';
+  return `<div class="card ${red?'red':'black'} ${size}">
+    <div class="corner tl">${card.rank}<br>${card.suit}</div>
+    <div class="center">${card.suit}</div>
+    <div class="corner br">${card.rank}<br>${card.suit}</div>
+  </div>`;
+}
+
+function showGameResult(elId, outcome, headline, detail, netPts){
+  const el=$(elId);
+  const cls = outcome==='win'?'win':outcome==='push'?'push':'loss';
+  const emoji = outcome==='win'?'🏆':outcome==='push'?'🤝':'😞';
+  const netStr = netPts>0?`+${netPts}`:String(netPts);
+  el.innerHTML = `<div class="game-result ${cls}">
+    <div class="res-emoji">${emoji}</div>
+    <div class="res-outcome">${headline}</div>
+    <div class="res-detail">${detail}</div>
+    <div class="res-pts">${netStr} pistettä</div>
+  </div>`;
+  el.style.display='block';
+  pollPoints();
+}
+
+function getBet(inputId){
+  const v = parseInt($(inputId).value,10);
+  if(!v||v<10||v>10000) { alert('Panoksen on oltava 10–10 000 pistettä.'); return null; }
+  if(!player||player.points < v){ alert('Ei tarpeeksi pisteitä.'); return null; }
+  return v;
+}
+
+// ── Coinflip ────────────────────────────────────────────────────────────────
+let cfChoice = 'heads';
+function cfChoose(c){
+  cfChoice=c;
+  $('cf-heads').classList.toggle('selected', c==='heads');
+  $('cf-tails').classList.toggle('selected', c==='tails');
+}
+async function doCoinflip(){
+  const bet=getBet('cf-bet'); if(!bet) return;
+  const btn=$('cf-btn'); btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await fetch(`/api/points/${player.id}/coinflip`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bet,choice:cfChoice})
+    });
+    const d=await r.json();
+    if(!r.ok){alert(d.error);return;}
+    player.points=d.points;
+    const resultName = d.result==='heads'?'👑 Kruuna':'🦅 Klaava';
+    showGameResult('cf-result', d.outcome,
+      d.outcome==='win'?`Voitit! (${resultName})`:`Hävisit (${resultName})`,
+      `Panos: ${bet} p · Voitto: ${d.payout} p`, d.net
+    );
+  }catch(e){alert('Virhe.');}
+  finally{btn.disabled=false;btn.textContent='Heitä kolikko';}
+}
+
+// ── WAR ─────────────────────────────────────────────────────────────────────
+async function doWar(){
+  const bet=getBet('war-bet'); if(!bet) return;
+  const btn=$('war-btn'); btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await fetch(`/api/points/${player.id}/war`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bet})
+    });
+    const d=await r.json();
+    if(!r.ok){alert(d.error);return;}
+    player.points=d.points;
+    $('war-result').innerHTML = `
+      <div class="mini-cards">${renderMiniCard(d.player_card,'md')}
+        <span style="font-size:1.5rem;align-self:center;color:var(--muted)">vs</span>
+        ${renderMiniCard(d.dealer_card,'md')}</div>`;
+    showGameResult('war-result', d.outcome,
+      d.outcome==='win'?'Voitit!':d.outcome==='push'?'Tasapeli!':'Hävisit',
+      `Sinun: ${d.player_card.rank}${d.player_card.suit} · Jakaja: ${d.dealer_card.rank}${d.dealer_card.suit}`,
+      d.net
+    );
+    $('war-result').querySelector('.mini-cards').style.marginTop='.5rem';
+  }catch(e){alert('Virhe.');}
+  finally{btn.disabled=false;btn.textContent='Pelaa WAR';}
+}
+
+// ── Baccarat ────────────────────────────────────────────────────────────────
+let bacSide='player';
+function bacChoose(s){
+  bacSide=s;
+  ['player','banker','tie'].forEach(x=>$('bac-'+x).classList.toggle('selected',x===s));
+}
+async function doBaccarat(){
+  const bet=getBet('bac-bet'); if(!bet) return;
+  const btn=$('bac-btn'); btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await fetch(`/api/points/${player.id}/baccarat`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bet,side:bacSide})
+    });
+    const d=await r.json();
+    if(!r.ok){alert(d.error);return;}
+    player.points=d.points;
+    const ph=d.player_hand.map(c=>renderMiniCard(c,'sm')).join('');
+    const bh=d.banker_hand.map(c=>renderMiniCard(c,'sm')).join('');
+    const sideLabels={player:'Pelaaja',banker:'Bankeri',tie:'Tasapeli'};
+    const winnerLabel=sideLabels[d.winner]||d.winner;
+    $('bac-result').innerHTML=`
+      <div style="display:flex;gap:1rem;justify-content:center;margin:.6rem 0;flex-wrap:wrap">
+        <div style="text-align:center">
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">PELAAJA (${d.player_total})</div>
+          <div class="mini-cards" style="justify-content:center">${ph}</div>
+        </div>
+        <div style="text-align:center">
+          <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem">BANKERI (${d.banker_total})</div>
+          <div class="mini-cards" style="justify-content:center">${bh}</div>
+        </div>
+      </div>`;
+    showGameResult('bac-result', d.outcome,
+      d.outcome==='win'?`Voitit! (${winnerLabel} voitti)`:d.outcome==='push'?`Tasapeli — palautus`:`Hävisit (${winnerLabel} voitti)`,
+      `Panos: ${bet} p · Voitto: ${d.payout} p`, d.net
+    );
+  }catch(e){alert('Virhe.');}
+  finally{btn.disabled=false;btn.textContent='Pelaa Baccarat';}
+}
+
+// ── Blackjack ────────────────────────────────────────────────────────────────
+let bjGameId = null;
+
+function bjReset(){
+  bjGameId=null;
+  $('bj-start-area').style.display='block';
+  $('bj-game-area').style.display='none';
+  $('bj-result').innerHTML='';
+  $('bj-new-btn').style.display='none';
+  $('bj-start-btn').disabled=false;
+}
+
+function renderBjState(d, resultHtml=''){
+  const pc=d.player_cards||[]; const dc=d.dealer_cards||[];
+  $('bj-player-cards').innerHTML=pc.map(c=>renderMiniCard(c,'md')).join('');
+  $('bj-dealer-cards').innerHTML=dc.map((c,i)=>(i===0||d.status!=='active')?renderMiniCard(c,'md'):'<div class="card back md"></div>').join('');
+  $('bj-player-total').textContent=`Yhteensä: ${d.player_total}`;
+  $('bj-dealer-total').textContent=d.status==='active'?`Näkyy: ${d.dealer_total}`:`Yhteensä: ${d.dealer_total}`;
+  const active=d.status==='active';
+  $('bj-hit').disabled=!active;
+  $('bj-stand').disabled=!active;
+  $('bj-double').disabled=!active;
+  if(resultHtml) $('bj-result').innerHTML=resultHtml;
+  if(!active) $('bj-new-btn').style.display='block';
+}
+
+async function doBlackjackStart(){
+  const bet=getBet('bj-bet'); if(!bet) return;
+  const btn=$('bj-start-btn'); btn.disabled=true;
+  try{
+    const r=await fetch(`/api/points/${player.id}/blackjack/start`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bet})
+    });
+    const d=await r.json();
+    if(!r.ok){alert(d.error);btn.disabled=false;return;}
+    player.points=d.points; bjGameId=d.game_id;
+    $('bj-start-area').style.display='none';
+    $('bj-game-area').style.display='block';
+    let resHtml='';
+    if(d.outcome){
+      const outcomes={blackjack:'🃏 Blackjack!',win:'Voitit!',push:'Tasapeli!',loss:'Hävisit',bust:'Ylitit 21!'};
+      resHtml=`<div class="game-result ${d.outcome==='loss'||d.outcome==='bust'?'loss':d.outcome==='push'?'push':'win'}">
+        <div class="res-emoji">${d.outcome==='blackjack'||d.outcome==='win'?'🏆':d.outcome==='push'?'🤝':'😞'}</div>
+        <div class="res-outcome">${outcomes[d.outcome]||d.outcome}</div>
+        <div class="res-pts">${d.net>0?'+':''}${d.net} pistettä</div>
+      </div>`;
+    }
+    renderBjState(d, resHtml);
+    pollPoints();
+  }catch(e){alert('Virhe.');btn.disabled=false;}
+}
+
+async function doBlackjackAction(action){
+  if(!bjGameId) return;
+  ['bj-hit','bj-stand','bj-double'].forEach(id=>$(id).disabled=true);
+  try{
+    const r=await fetch(`/api/points/blackjack/${bjGameId}/action`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})
+    });
+    const d=await r.json();
+    if(!r.ok){alert(d.error);['bj-hit','bj-stand','bj-double'].forEach(id=>$(id).disabled=false);return;}
+    player.points=d.points;
+    let resHtml='';
+    if(d.outcome){
+      const labels={win:'🏆 Voitit!',push:'🤝 Tasapeli!',loss:'😞 Hävisit',bust:'💥 Ylitit 21!'};
+      const cls=d.outcome==='win'?'win':d.outcome==='push'?'push':'loss';
+      resHtml=`<div class="game-result ${cls}">
+        <div class="res-outcome">${labels[d.outcome]||d.outcome}</div>
+        <div class="res-pts">${d.net>0?'+':''}${d.net} pistettä</div>
+      </div>`;
+    }
+    renderBjState(d, resHtml);
+    pollPoints();
+  }catch(e){alert('Virhe.');}
+}
+
+// ── Pikapokeri ────────────────────────────────────────────────────────────────
+let pikaGameId=null, pikaHeld=new Set();
+
+function pikaReset(){
+  pikaGameId=null; pikaHeld=new Set();
+  $('pika-start-area').style.display='block';
+  $('pika-game-area').style.display='none';
+  $('pika-result').innerHTML='';
+  $('pika-new-btn').style.display='none';
+  $('pika-deal-btn').disabled=false;
+}
+
+function renderPikaHand(hand, allowToggle){
+  return hand.map((card,i)=>{
+    const held=pikaHeld.has(i);
+    return `<div class="pika-card-wrap ${held?'held':''}" ${allowToggle?`onclick="pikaToggleHold(${i})"`:'id=""'}>
+      <div class="hold-label">PIDÄ</div>
+      ${renderMiniCard(card,'md')}
+    </div>`;
+  }).join('');
+}
+
+function pikaToggleHold(i){
+  if(pikaHeld.has(i)) pikaHeld.delete(i); else pikaHeld.add(i);
+  const hand=JSON.parse($('pika-hand').dataset.hand||'[]');
+  $('pika-hand').innerHTML=renderPikaHand(hand, true);
+}
+
+async function doPikaDeal(){
+  const bet=getBet('pika-bet'); if(!bet) return;
+  const btn=$('pika-deal-btn'); btn.disabled=true;
+  try{
+    const r=await fetch(`/api/points/${player.id}/pikapokeri/start`,{
+      method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({bet})
+    });
+    const d=await r.json();
+    if(!r.ok){alert(d.error);btn.disabled=false;return;}
+    player.points=d.points; pikaGameId=d.game_id; pikaHeld=new Set();
+    $('pika-start-area').style.display='none';
+    $('pika-game-area').style.display='block';
+    const handEl=$('pika-hand');
+    handEl.dataset.hand=JSON.stringify(d.hand);
+    handEl.innerHTML=renderPikaHand(d.hand, true);
+    $('pika-result').innerHTML='';
+    $('pika-draw-btn').disabled=false;
+    $('pika-new-btn').style.display='none';
+    pollPoints();
+  }catch(e){alert('Virhe.');btn.disabled=false;}
+}
+
+async function doPikaDraw(){
+  if(!pikaGameId) return;
+  const btn=$('pika-draw-btn'); btn.disabled=true;
+  try{
+    const r=await fetch(`/api/points/pikapokeri/${pikaGameId}/draw`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({hold:[...pikaHeld]})
+    });
+    const d=await r.json();
+    if(!r.ok){alert(d.error);btn.disabled=false;return;}
+    player.points=d.points;
+    $('pika-hand').dataset.hand=JSON.stringify(d.hand);
+    $('pika-hand').innerHTML=renderPikaHand(d.hand, false);
+    const cls=d.outcome==='win'?'win':'loss';
+    const emoji=d.outcome==='win'?'🏆':'😞';
+    $('pika-result').innerHTML=`<div class="game-result ${cls}">
+      <div class="res-emoji">${emoji}</div>
+      <div class="res-outcome">${esc(d.result_name)}</div>
+      <div class="res-detail">Panos: ${d.bet} p · Kerroin: ${d.mult}× · Voitto: ${d.payout} p</div>
+      <div class="res-pts">${d.net>0?'+':''}${d.net} pistettä</div>
+    </div>`;
+    $('pika-new-btn').style.display='block';
+    pollPoints();
+  }catch(e){alert('Virhe.');}
 }
 </script>
 </body>
