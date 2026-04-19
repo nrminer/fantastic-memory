@@ -314,6 +314,31 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
   animation:cellWin .85s ease infinite;
   background:rgba(201,168,76,.18)!important;border-color:var(--gold)!important;
 }
+@keyframes scatterPulse{
+  0%,100%{box-shadow:inset 0 0 0 2px #a855f7,0 0 10px rgba(168,85,247,.4)}
+  50%{box-shadow:inset 0 0 0 3px #d946ef,0 0 28px rgba(217,70,239,.85)}
+}
+.slot-cell.scatter{
+  animation:scatterPulse .75s ease infinite;
+  background:rgba(168,85,247,.2)!important;border-color:#a855f7!important;
+}
+.free-spins-banner{
+  position:fixed;inset:0;z-index:500;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.82);backdrop-filter:blur(4px);
+  pointer-events:none;opacity:0;transition:opacity .35s;
+}
+.free-spins-banner.visible{opacity:1;pointer-events:all}
+.fsb-title{
+  font-size:2.8rem;font-weight:900;letter-spacing:.04em;
+  background:linear-gradient(135deg,#a855f7,#ec4899,#a855f7);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  text-shadow:none;filter:drop-shadow(0 0 18px rgba(168,85,247,.7));
+  animation:scatterPulse 1s ease infinite;
+}
+.fsb-sub{font-size:1.1rem;color:#e2e8f0;margin:.4rem 0 1.2rem;opacity:.9}
+.fsb-counter{font-size:4.5rem;font-weight:900;color:#a855f7;line-height:1}
+.fsb-info{font-size:.85rem;color:var(--muted);margin-top:.5rem}
 @media(max-width:380px){
   .slot-cell{width:66px;height:66px;font-size:2rem}
   .slot-machine-wrap{padding:10px;gap:4px}
@@ -1632,19 +1657,22 @@ async function doPikaDraw(){
 // ── Slots ──────────────────────────────────────────────────────────────────
 const SLOT_DEFS = {
   fruits: {
-    symbols: {cherry:'🍒',lemon:'🍋',orange:'🍊',grape:'🍇',bell:'🔔',star:'⭐',jackpot:'🎰',diamond:'💎'},
+    symbols: {cherry:'🍒',lemon:'🍋',orange:'🍊',grape:'🍇',bell:'🔔',star:'⭐',jackpot:'🎰',diamond:'💎',scatter:'💰'},
     payouts: {cherry:2,lemon:3,orange:4,grape:6,bell:12,star:20,jackpot:50,diamond:150},
     order:   ['diamond','jackpot','star','bell','grape','orange','lemon','cherry'],
+    scatterEmoji: '💰', freeSpins: 8, fsMult: 2,
   },
   egypt: {
-    symbols: {scarab:'🪲',eye:'👁',jar:'🏺',eagle:'🦅',cat:'😺',pharaoh:'👑',book:'📚'},
+    symbols: {scarab:'🪲',eye:'👁',jar:'🏺',eagle:'🦅',cat:'😺',pharaoh:'👑',book:'📚',scatter:'🔮'},
     payouts: {scarab:2,eye:3,jar:5,eagle:8,cat:15,pharaoh:40,book:125},
     order:   ['book','pharaoh','cat','eagle','jar','eye','scarab'],
+    scatterEmoji: '🔮', freeSpins: 10, fsMult: 2,
   },
   space: {
-    symbols: {planet:'🪐',comet:'☄️',alien:'👾',rocket:'🚀',stars:'⭐',moon:'🌙',gem:'💎'},
+    symbols: {planet:'🪐',comet:'☄️',alien:'👾',rocket:'🚀',stars:'⭐',moon:'🌙',gem:'💎',scatter:'🌀'},
     payouts: {planet:2,comet:3,alien:5,rocket:8,stars:15,moon:40,gem:125},
     order:   ['gem','moon','stars','rocket','alien','comet','planet'],
+    scatterEmoji: '🌀', freeSpins: 8, fsMult: 3,
   },
 };
 
@@ -1686,7 +1714,77 @@ function renderSlotPaytable(){
   $('slot-paytable').innerHTML=`
     <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">3 samaa symbolia peliviivalla</div>
     <table class="pika-payouts" style="width:100%">${rows}</table>
-    <div style="font-size:.7rem;color:var(--muted);margin-top:.35rem">5 peliviivaa: 3 vaakasuoraa riviä + ↘ ↗ diagonaalit</div>`;
+    <div style="font-size:.7rem;color:var(--muted);margin-top:.35rem">5 peliviivaa: 3 vaakasuoraa riviä + ↘ ↗ diagonaalit</div>
+    <div style="margin-top:.5rem;padding:.4rem .5rem;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.35);border-radius:8px;font-size:.78rem;color:#c084fc">
+      ${def.scatterEmoji} <strong>Sirontasymboli</strong> — 3+ missä tahansa aktivoi <strong>${def.freeSpins} ilmaispyörää</strong> (${def.fsMult}× kerroin)
+    </div>`;
+}
+
+const delay = ms => new Promise(res => setTimeout(res, ms));
+
+function startSpinning(def, excludeScatter=false){
+  const symKeys = Object.keys(def.symbols).filter(k=>excludeScatter?k!=='scatter':true);
+  const symVals = symKeys.map(k=>def.symbols[k]);
+  for(let col=0;col<3;col++) for(let row=0;row<3;row++){
+    const cell=$(`sc-${col}-${row}`);
+    cell.classList.remove('win','stopping','scatter');
+    cell.classList.add('spinning');
+    spinIntervals[`${col}-${row}`]=setInterval(()=>{
+      cell.textContent=symVals[Math.floor(Math.random()*symVals.length)];
+    }, 95);
+  }
+}
+
+async function doFreeSpins(data, def){
+  const banner=$('free-spins-banner');
+  const counter=$('fsb-counter');
+  const sub=$('fsb-sub');
+  const info=$('fsb-info');
+  let totalBonus=0;
+
+  sub.textContent=`${def.scatterEmoji} ${data.free_spin_count} ilmaispyörää × ${data.free_spin_mult}× kerroin!`;
+  info.textContent=`Panos: ${data.bet} p`;
+  counter.textContent=`${data.free_spin_count}`;
+
+  banner.classList.add('visible');
+  await delay(2000);
+
+  for(let i=0;i<data.free_spin_results.length;i++){
+    const fs=data.free_spin_results[i];
+    counter.textContent=`${i+1} / ${data.free_spin_count}`;
+    info.textContent=`Kierros ${i+1}...`;
+
+    startSpinning(def, true);
+    await delay(1400);
+
+    // Stop each reel
+    for(let col=0;col<3;col++){
+      for(let row=0;row<3;row++){
+        clearInterval(spinIntervals[`${col}-${row}`]);
+        const cell=$(`sc-${col}-${row}`);
+        cell.classList.remove('spinning');
+        cell.textContent=def.symbols[fs.grid[col][row]]||fs.grid[col][row];
+        cell.classList.add('stopping');
+        setTimeout(()=>cell.classList.remove('stopping'),400);
+      }
+      await delay(330);
+    }
+    await delay(250);
+
+    if(fs.wins&&fs.wins.length>0){
+      fs.wins.forEach(w=>w.cells.forEach(([c,r])=>$(`sc-${c}-${r}`).classList.add('win')));
+    }
+    totalBonus+=fs.payout;
+    info.textContent=`Kierros ${i+1} — ${fs.payout>0?'+'+fs.payout+' p':'ei osumia'} (yht. ${totalBonus} p)`;
+    await delay(950);
+  }
+
+  counter.textContent=`+${totalBonus}`;
+  sub.textContent='Ilmaispyörät ohi!';
+  info.textContent=`Kokonaisbonus: ${totalBonus} pistettä`;
+  await delay(2200);
+  banner.classList.remove('visible');
+  await delay(400);
 }
 
 async function doSlotSpin(){
@@ -1696,19 +1794,9 @@ async function doSlotSpin(){
   slotsSpinning=true; btn.disabled=true; btn.textContent='…';
   $('slots-result').innerHTML='';
   const def=SLOT_DEFS[slotTheme];
-  const symVals=Object.values(def.symbols);
 
-  // Clear win state and start cycling
-  for(let col=0;col<3;col++) for(let row=0;row<3;row++){
-    const cell=$(`sc-${col}-${row}`);
-    cell.classList.remove('win','stopping');
-    cell.classList.add('spinning');
-    spinIntervals[`${col}-${row}`]=setInterval(()=>{
-      cell.textContent=symVals[Math.floor(Math.random()*symVals.length)];
-    }, 95);
-  }
+  startSpinning(def);
 
-  // Fetch result from server
   let data;
   try{
     const r=await fetch(`/api/points/${player.id}/slots`,{
@@ -1729,27 +1817,39 @@ async function doSlotSpin(){
     alert('Virhe.'); return;
   }
 
-  // Stop reels one by one (left → middle → right) with stagger
-  const STOP_AT=[1100,1650,2200];
-  STOP_AT.forEach((delay,col)=>{
-    setTimeout(()=>{
-      for(let row=0;row<3;row++){
-        clearInterval(spinIntervals[`${col}-${row}`]);
-        const cell=$(`sc-${col}-${row}`);
-        cell.classList.remove('spinning');
-        cell.textContent=def.symbols[data.grid[col][row]];
-        cell.classList.add('stopping');
-        setTimeout(()=>cell.classList.remove('stopping'),450);
-      }
-      if(col===2){
-        setTimeout(()=>{
-          showSlotResult(data,def);
-          slotsSpinning=false;
-          btn.disabled=false; btn.textContent='🎰 Pyöräytä!';
-        },400);
-      }
-    },delay);
+  // Stop reels left → middle → right
+  await new Promise(resolve=>{
+    const STOP_AT=[1100,1650,2200];
+    STOP_AT.forEach((ms,col)=>{
+      setTimeout(()=>{
+        for(let row=0;row<3;row++){
+          clearInterval(spinIntervals[`${col}-${row}`]);
+          const cell=$(`sc-${col}-${row}`);
+          cell.classList.remove('spinning');
+          cell.textContent=def.symbols[data.grid[col][row]];
+          cell.classList.add('stopping');
+          setTimeout(()=>cell.classList.remove('stopping'),450);
+        }
+        if(col===2) setTimeout(resolve, 450);
+      },ms);
+    });
   });
+
+  // Highlight scatter positions
+  if(data.scatter_positions&&data.scatter_positions.length>0){
+    data.scatter_positions.forEach(([col,row])=>$(`sc-${col}-${row}`).classList.add('scatter'));
+  }
+
+  if(data.free_spins_triggered){
+    await delay(700);
+    await doFreeSpins(data, def);
+    showFinalSlotResult(data, def);
+  } else {
+    showSlotResult(data, def);
+  }
+
+  slotsSpinning=false;
+  btn.disabled=false; btn.textContent='🎰 Pyöräytä!';
 }
 
 function showSlotResult(data,def){
@@ -1763,7 +1863,13 @@ function showSlotResult(data,def){
       <div class="res-detail">Panos: ${data.bet} p · Voitto: ${data.payout} p</div>
       <div class="res-pts">+${data.net} pistettä</div>
     </div>`;
-  }else{
+  } else if(data.scatter_positions&&data.scatter_positions.length>0){
+    $('slots-result').innerHTML=`<div class="game-result" style="margin-top:.75rem;border-color:rgba(168,85,247,.4)">
+      <div class="res-emoji">${def.scatterEmoji}</div>
+      <div class="res-outcome" style="color:#c084fc">${data.scatter_positions.length}× sirontasymboli</div>
+      <div class="res-pts" style="color:var(--muted)">Tarvitaan 3+ sirontaa · −${data.bet} pistettä</div>
+    </div>`;
+  } else {
     $('slots-result').innerHTML=`<div class="game-result loss" style="margin-top:.75rem">
       <div class="res-emoji">😞</div>
       <div class="res-outcome">Ei osumia — yritä uudelleen!</div>
@@ -1772,6 +1878,25 @@ function showSlotResult(data,def){
   }
   pollPoints();
 }
+
+function showFinalSlotResult(data, def){
+  const totalNet=(data.payout - data.bet) + data.bonus_payout;
+  $('slots-result').innerHTML=`<div class="game-result win" style="margin-top:.75rem;border-color:rgba(168,85,247,.6);background:rgba(168,85,247,.08)">
+    <div class="res-emoji">${def.scatterEmoji}✨${def.scatterEmoji}</div>
+    <div class="res-outcome" style="color:#c084fc">🎉 FREE SPINS — ${data.free_spin_count}× kierrosta (${data.free_spin_mult}× kerroin)</div>
+    <div class="res-detail">Perusvoitto: ${data.payout} p · Bonus: ${data.bonus_payout} p</div>
+    <div class="res-pts" style="color:#c084fc">${totalNet>=0?'+':''}${totalNet} pistettä yhteensä</div>
+  </div>`;
+  pollPoints();
+}
 </script>
+
+<!-- Free Spins Banner -->
+<div class="free-spins-banner" id="free-spins-banner">
+  <div class="fsb-title">✨ FREE SPINS! ✨</div>
+  <div class="fsb-sub" id="fsb-sub">Sirontasymbolit aktivoivat ilmaispyörät!</div>
+  <div class="fsb-counter" id="fsb-counter">0</div>
+  <div class="fsb-info" id="fsb-info"></div>
+</div>
 </body>
 </html>
