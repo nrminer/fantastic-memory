@@ -829,6 +829,51 @@ SETTINGS_DEFAULTS = {
     'point_expiry_days':'365',
 }
 
+# Slot machine themes — each symbol has a weight (higher = more frequent)
+SLOT_THEMES = {
+    'fruits': {
+        'symbols': [
+            {'id':'cherry',  'weight':30}, {'id':'lemon',   'weight':25},
+            {'id':'orange',  'weight':20}, {'id':'grape',   'weight':14},
+            {'id':'bell',    'weight':7},  {'id':'star',    'weight':4},
+            {'id':'jackpot', 'weight':2},  {'id':'diamond', 'weight':1},
+        ],
+        'payouts': {'cherry':2,'lemon':3,'orange':4,'grape':6,'bell':12,'star':20,'jackpot':50,'diamond':150},
+    },
+    'egypt': {
+        'symbols': [
+            {'id':'scarab',  'weight':30}, {'id':'eye',     'weight':24},
+            {'id':'jar',     'weight':18}, {'id':'eagle',   'weight':12},
+            {'id':'cat',     'weight':8},  {'id':'pharaoh', 'weight':5},
+            {'id':'book',    'weight':3},
+        ],
+        'payouts': {'scarab':2,'eye':3,'jar':5,'eagle':8,'cat':15,'pharaoh':40,'book':125},
+    },
+    'space': {
+        'symbols': [
+            {'id':'planet',  'weight':30}, {'id':'comet',   'weight':24},
+            {'id':'alien',   'weight':18}, {'id':'rocket',  'weight':12},
+            {'id':'stars',   'weight':8},  {'id':'moon',    'weight':5},
+            {'id':'gem',     'weight':3},
+        ],
+        'payouts': {'planet':2,'comet':3,'alien':5,'rocket':8,'stars':15,'moon':40,'gem':125},
+    },
+}
+SLOT_PAYLINES = [
+    [(0,0),(1,0),(2,0)],  # top row
+    [(0,1),(1,1),(2,1)],  # middle row
+    [(0,2),(1,2),(2,2)],  # bottom row
+    [(0,0),(1,1),(2,2)],  # diagonal ↘
+    [(0,2),(1,1),(2,0)],  # diagonal ↗
+]
+
+def _slot_spin(theme_id):
+    theme   = SLOT_THEMES.get(theme_id, SLOT_THEMES['fruits'])
+    ids     = [s['id'] for s in theme['symbols']]
+    weights = [s['weight'] for s in theme['symbols']]
+    # grid[col][row], 3 columns × 3 rows
+    return [[random.choices(ids, weights=weights)[0] for _ in range(3)] for _ in range(3)]
+
 def _get_streak_mode(db, pid):
     row = db.execute('SELECT streak_mode FROM players WHERE id=?', (pid,)).fetchone()
     if not row: return 'normal'
@@ -1300,6 +1345,64 @@ def game_bj_action(gid):
         state['payout']  = payout
         state['net']     = payout - bet  # bet is doubled if they doubled
     return jsonify(state)
+
+# ─── Slots ───────────────────────────────────────────────────────────────────
+
+@app.route('/api/points/<int:pid>/slots', methods=['POST'])
+def game_slots(pid):
+    d        = request.json or {}
+    db       = get_db()
+    bet, err = _get_bet(d, pid, db)
+    if err: return err
+    theme_id = d.get('theme', 'fruits')
+    if theme_id not in SLOT_THEMES:
+        theme_id = 'fruits'
+    _atomic_deduct_points(db, pid, bet, f'Slots panos ({theme_id})')
+    streak = _get_streak_mode(db, pid)
+    grid   = _slot_spin(theme_id)
+    theme  = SLOT_THEMES[theme_id]
+
+    def calc_wins(g):
+        wins = []
+        for i, line in enumerate(SLOT_PAYLINES):
+            syms = [g[col][row] for col, row in line]
+            if syms[0] == syms[1] == syms[2]:
+                mult = theme['payouts'].get(syms[0], 0)
+                wins.append({'line': i, 'symbol': syms[0], 'mult': mult,
+                             'cells': [[col, row] for col, row in line]})
+        return wins
+
+    wins = calc_wins(grid)
+
+    if streak == 'lose' and wins:
+        # Reroll until no win (max 10 tries)
+        for _ in range(10):
+            grid = _slot_spin(theme_id)
+            wins = calc_wins(grid)
+            if not wins:
+                break
+    elif streak == 'win' and not wins:
+        # Force 3-of-a-kind on middle row with lowest symbol
+        sym = theme['symbols'][0]['id']
+        grid[0][1] = grid[1][1] = grid[2][1] = sym
+        wins = calc_wins(grid)
+
+    total_mult = sum(w['mult'] for w in wins)
+    payout     = bet * total_mult
+    net        = payout - bet
+    if payout > 0:
+        _add_points(db, pid, payout, f'Slots voitto ({theme_id})')
+    db.commit()
+    bal = db.execute('SELECT points FROM players WHERE id=?', (pid,)).fetchone()['points'] or 0
+    return jsonify({
+        'grid':       grid,
+        'wins':       wins,
+        'total_mult': total_mult,
+        'bet':        bet,
+        'payout':     payout,
+        'net':        net,
+        'points':     bal,
+    })
 
 # ─── Streak mode (admin) ─────────────────────────────────────────────────────
 

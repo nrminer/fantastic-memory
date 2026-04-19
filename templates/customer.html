@@ -274,6 +274,51 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
 .coin-anim{font-size:3.5rem;display:inline-block;animation:coinSpin .9s ease-out forwards}
 .game-result{animation:popIn .3s ease both}
 
+/* ── Slot machine ─────────────────────────────────────────────────────────── */
+.slot-outer{display:flex;justify-content:center;margin-bottom:.85rem}
+.slot-machine-wrap{
+  display:flex;gap:6px;
+  background:linear-gradient(180deg,#0b1f10 0%,#163520 50%,#0b1f10 100%);
+  border:3px solid var(--gold);border-radius:18px;padding:14px;
+  box-shadow:0 0 32px rgba(201,168,76,.25),inset 0 0 24px rgba(0,0,0,.6);
+  position:relative;
+}
+.slot-reel{display:flex;flex-direction:column;gap:5px}
+.slot-cell{
+  width:76px;height:76px;background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:2.3rem;line-height:1;transition:border-color .2s;
+  position:relative;overflow:hidden;
+}
+.slot-midline{
+  position:absolute;left:14px;right:14px;top:calc(50% - 1px);
+  height:2px;pointer-events:none;
+  background:linear-gradient(90deg,transparent 0%,rgba(201,168,76,.7) 30%,rgba(201,168,76,.7) 70%,transparent 100%);
+}
+@keyframes reelCycle{
+  0%{transform:translateY(-6px);filter:blur(1px);opacity:.7}
+  50%{transform:translateY(6px);filter:blur(1px);opacity:.7}
+  100%{transform:translateY(-6px);filter:blur(1px);opacity:.7}
+}
+.slot-cell.spinning{animation:reelCycle .11s linear infinite}
+@keyframes cellBounce{
+  0%{transform:scale(1.2);opacity:.6}100%{transform:scale(1);opacity:1}
+}
+.slot-cell.stopping{animation:cellBounce .35s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes cellWin{
+  0%,100%{box-shadow:inset 0 0 0 2px var(--gold),0 0 14px rgba(201,168,76,.5)}
+  50%{box-shadow:inset 0 0 0 3px var(--gold2),0 0 30px rgba(232,200,112,.85)}
+}
+.slot-cell.win{
+  animation:cellWin .85s ease infinite;
+  background:rgba(201,168,76,.18)!important;border-color:var(--gold)!important;
+}
+@media(max-width:380px){
+  .slot-cell{width:66px;height:66px;font-size:2rem}
+  .slot-machine-wrap{padding:10px;gap:4px}
+}
+
 /* ── Claimed notification ─────────────────────────────────────────────────── */
 .claim-banner{
   position:fixed;top:70px;left:50%;transform:translateX(-50%) translateY(-40px);
@@ -457,6 +502,7 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
         <button class="gtab-btn" onclick="switchGameTab('baccarat')">🎴 Baccarat</button>
         <button class="gtab-btn" onclick="switchGameTab('blackjack')">🃏 Blackjack</button>
         <button class="gtab-btn" onclick="switchGameTab('pikapokeri')">♠ Pikapokeri</button>
+        <button class="gtab-btn" onclick="switchGameTab('slots')">🎰 Slots</button>
       </div>
 
       <!-- Kolikonheitto -->
@@ -567,6 +613,51 @@ button.btn-secondary:hover{border-color:var(--gold);color:var(--gold)}
           <div id="pika-result"></div>
           <button class="btn-secondary" id="pika-new-btn" onclick="pikaReset()" style="display:none;margin-top:.75rem;width:100%">Uusi peli</button>
         </div>
+      </div>
+
+      <!-- Slots -->
+      <div class="game-panel" id="gpanel-slots">
+        <!-- Theme selector -->
+        <div class="game-tabs-bar" style="margin-bottom:.75rem">
+          <button class="gtab-btn active" id="stheme-fruits" onclick="setSlotTheme('fruits')">🍒 Hedelmät</button>
+          <button class="gtab-btn" id="stheme-egypt" onclick="setSlotTheme('egypt')">🏺 Egypti</button>
+          <button class="gtab-btn" id="stheme-space" onclick="setSlotTheme('space')">🚀 Avaruus</button>
+        </div>
+
+        <!-- Machine -->
+        <div class="slot-outer">
+          <div class="slot-machine-wrap" id="slot-machine-wrap">
+            <div class="slot-reel">
+              <div class="slot-cell" id="sc-0-0"></div>
+              <div class="slot-cell" id="sc-0-1"></div>
+              <div class="slot-cell" id="sc-0-2"></div>
+            </div>
+            <div class="slot-reel">
+              <div class="slot-cell" id="sc-1-0"></div>
+              <div class="slot-cell" id="sc-1-1"></div>
+              <div class="slot-cell" id="sc-1-2"></div>
+            </div>
+            <div class="slot-reel">
+              <div class="slot-cell" id="sc-2-0"></div>
+              <div class="slot-cell" id="sc-2-1"></div>
+              <div class="slot-cell" id="sc-2-2"></div>
+            </div>
+            <div class="slot-midline"></div>
+          </div>
+        </div>
+
+        <!-- Bet -->
+        <div class="bet-row">
+          <label>Panos (pistettä)</label>
+          <input class="bet-inp" type="number" id="slots-bet" value="50" min="10" max="5000" step="10">
+        </div>
+
+        <!-- Paytable toggle -->
+        <button class="btn-secondary" style="width:100%;margin-bottom:.5rem" onclick="toggleSlotPaytable()">📋 Voittotaulukko</button>
+        <div id="slot-paytable" style="display:none;margin-bottom:.5rem"></div>
+
+        <button class="btn-primary" id="slots-btn" onclick="doSlotSpin()">🎰 Pyöräytä!</button>
+        <div id="slots-result"></div>
       </div>
 
     </div><!-- section-box games -->
@@ -1177,7 +1268,7 @@ async function doCashRedeem(){
 
 // ── Game helpers ────────────────────────────────────────────────────────────
 function switchGameTab(which){
-  const tabs = ['coinflip','war','baccarat','blackjack','pikapokeri'];
+  const tabs = ['coinflip','war','baccarat','blackjack','pikapokeri','slots'];
   const btns = $('game-tabs-bar').querySelectorAll('.gtab-btn');
   tabs.forEach((t,i)=>{
     const panel=$('gpanel-'+t);
@@ -1185,6 +1276,7 @@ function switchGameTab(which){
     panel.classList.toggle('active', isActive);
     btns[i].classList.toggle('active', isActive);
   });
+  if(which==='slots') initSlotCells();
 }
 
 function renderMiniCard(card, size='sm', delayMs=-1){
@@ -1535,6 +1627,150 @@ async function doPikaDraw(){
     $('pika-new-btn').style.display='block';
     pollPoints();
   }catch(e){alert('Virhe.');}
+}
+
+// ── Slots ──────────────────────────────────────────────────────────────────
+const SLOT_DEFS = {
+  fruits: {
+    symbols: {cherry:'🍒',lemon:'🍋',orange:'🍊',grape:'🍇',bell:'🔔',star:'⭐',jackpot:'🎰',diamond:'💎'},
+    payouts: {cherry:2,lemon:3,orange:4,grape:6,bell:12,star:20,jackpot:50,diamond:150},
+    order:   ['diamond','jackpot','star','bell','grape','orange','lemon','cherry'],
+  },
+  egypt: {
+    symbols: {scarab:'🪲',eye:'👁',jar:'🏺',eagle:'🦅',cat:'😺',pharaoh:'👑',book:'📚'},
+    payouts: {scarab:2,eye:3,jar:5,eagle:8,cat:15,pharaoh:40,book:125},
+    order:   ['book','pharaoh','cat','eagle','jar','eye','scarab'],
+  },
+  space: {
+    symbols: {planet:'🪐',comet:'☄️',alien:'👾',rocket:'🚀',stars:'⭐',moon:'🌙',gem:'💎'},
+    payouts: {planet:2,comet:3,alien:5,rocket:8,stars:15,moon:40,gem:125},
+    order:   ['gem','moon','stars','rocket','alien','comet','planet'],
+  },
+};
+
+let slotTheme = 'fruits';
+let slotsSpinning = false;
+const spinIntervals = {};
+
+function setSlotTheme(t){
+  slotTheme = t;
+  ['fruits','egypt','space'].forEach(id=>$('stheme-'+id).classList.toggle('active',id===t));
+  if($('slot-paytable').style.display!=='none') renderSlotPaytable();
+  initSlotCells();
+}
+
+function initSlotCells(){
+  const def = SLOT_DEFS[slotTheme];
+  const symVals = Object.values(def.symbols);
+  for(let col=0;col<3;col++) for(let row=0;row<3;row++){
+    const cell = $(`sc-${col}-${row}`);
+    cell.textContent = symVals[Math.floor(Math.random()*symVals.length)];
+    cell.classList.remove('spinning','stopping','win');
+  }
+  $('slots-result').innerHTML='';
+}
+
+function toggleSlotPaytable(){
+  const el=$('slot-paytable');
+  if(el.style.display==='none'){ renderSlotPaytable(); el.style.display='block'; }
+  else el.style.display='none';
+}
+
+function renderSlotPaytable(){
+  const def = SLOT_DEFS[slotTheme];
+  const rows = def.order.map(id=>`
+    <tr>
+      <td style="font-size:1.15rem;padding:.25rem .4rem">${def.symbols[id]}${def.symbols[id]}${def.symbols[id]}</td>
+      <td style="text-align:right;color:var(--gold2);font-weight:700;padding:.25rem .4rem">${def.payouts[id]}× panos</td>
+    </tr>`).join('');
+  $('slot-paytable').innerHTML=`
+    <div style="font-size:.7rem;color:var(--muted);margin-bottom:.3rem;text-transform:uppercase;letter-spacing:.06em">3 samaa symbolia peliviivalla</div>
+    <table class="pika-payouts" style="width:100%">${rows}</table>
+    <div style="font-size:.7rem;color:var(--muted);margin-top:.35rem">5 peliviivaa: 3 vaakasuoraa riviä + ↘ ↗ diagonaalit</div>`;
+}
+
+async function doSlotSpin(){
+  if(slotsSpinning) return;
+  const bet=getBet('slots-bet'); if(!bet) return;
+  const btn=$('slots-btn');
+  slotsSpinning=true; btn.disabled=true; btn.textContent='…';
+  $('slots-result').innerHTML='';
+  const def=SLOT_DEFS[slotTheme];
+  const symVals=Object.values(def.symbols);
+
+  // Clear win state and start cycling
+  for(let col=0;col<3;col++) for(let row=0;row<3;row++){
+    const cell=$(`sc-${col}-${row}`);
+    cell.classList.remove('win','stopping');
+    cell.classList.add('spinning');
+    spinIntervals[`${col}-${row}`]=setInterval(()=>{
+      cell.textContent=symVals[Math.floor(Math.random()*symVals.length)];
+    }, 95);
+  }
+
+  // Fetch result from server
+  let data;
+  try{
+    const r=await fetch(`/api/points/${player.id}/slots`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bet,theme:slotTheme})
+    });
+    data=await r.json();
+    if(!r.ok){
+      for(const k in spinIntervals) clearInterval(spinIntervals[k]);
+      for(let col=0;col<3;col++) for(let row=0;row<3;row++) $(`sc-${col}-${row}`).classList.remove('spinning');
+      slotsSpinning=false; btn.disabled=false; btn.textContent='🎰 Pyöräytä!';
+      alert(data.error||'Virhe.'); return;
+    }
+    player.points=data.points;
+  }catch(e){
+    for(const k in spinIntervals) clearInterval(spinIntervals[k]);
+    slotsSpinning=false; btn.disabled=false; btn.textContent='🎰 Pyöräytä!';
+    alert('Virhe.'); return;
+  }
+
+  // Stop reels one by one (left → middle → right) with stagger
+  const STOP_AT=[1100,1650,2200];
+  STOP_AT.forEach((delay,col)=>{
+    setTimeout(()=>{
+      for(let row=0;row<3;row++){
+        clearInterval(spinIntervals[`${col}-${row}`]);
+        const cell=$(`sc-${col}-${row}`);
+        cell.classList.remove('spinning');
+        cell.textContent=def.symbols[data.grid[col][row]];
+        cell.classList.add('stopping');
+        setTimeout(()=>cell.classList.remove('stopping'),450);
+      }
+      if(col===2){
+        setTimeout(()=>{
+          showSlotResult(data,def);
+          slotsSpinning=false;
+          btn.disabled=false; btn.textContent='🎰 Pyöräytä!';
+        },400);
+      }
+    },delay);
+  });
+}
+
+function showSlotResult(data,def){
+  if(data.wins&&data.wins.length>0){
+    data.wins.forEach(w=>w.cells.forEach(([col,row])=>$(`sc-${col}-${row}`).classList.add('win')));
+    const best=data.wins.reduce((a,b)=>a.mult>b.mult?a:b);
+    const em=def.symbols[best.symbol];
+    $('slots-result').innerHTML=`<div class="game-result win" style="margin-top:.75rem">
+      <div class="res-emoji">${em}</div>
+      <div class="res-outcome">🏆 Voitit! (${data.total_mult}× yhteensä)</div>
+      <div class="res-detail">Panos: ${data.bet} p · Voitto: ${data.payout} p</div>
+      <div class="res-pts">+${data.net} pistettä</div>
+    </div>`;
+  }else{
+    $('slots-result').innerHTML=`<div class="game-result loss" style="margin-top:.75rem">
+      <div class="res-emoji">😞</div>
+      <div class="res-outcome">Ei osumia — yritä uudelleen!</div>
+      <div class="res-pts">−${data.bet} pistettä</div>
+    </div>`;
+  }
+  pollPoints();
 }
 </script>
 </body>
