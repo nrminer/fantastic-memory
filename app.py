@@ -829,6 +829,58 @@ SETTINGS_DEFAULTS = {
     'point_expiry_days':'365',
 }
 
+# Slot machine themes — each symbol has a weight (higher = more frequent)
+SLOT_THEMES = {
+    'fruits': {
+        'symbols': [
+            {'id':'cherry',  'weight':28}, {'id':'lemon',   'weight':23},
+            {'id':'orange',  'weight':18}, {'id':'grape',   'weight':13},
+            {'id':'bell',    'weight':7},  {'id':'star',    'weight':4},
+            {'id':'jackpot', 'weight':2},  {'id':'diamond', 'weight':1},
+            {'id':'scatter', 'weight':6},  # 💰 bonus scatter
+        ],
+        'payouts':    {'cherry':2,'lemon':3,'orange':4,'grape':6,'bell':12,'star':20,'jackpot':50,'diamond':150},
+        'free_spins': 8,
+        'fs_mult':    2,
+    },
+    'egypt': {
+        'symbols': [
+            {'id':'scarab',  'weight':28}, {'id':'eye',     'weight':22},
+            {'id':'jar',     'weight':17}, {'id':'eagle',   'weight':11},
+            {'id':'cat',     'weight':8},  {'id':'pharaoh', 'weight':5},
+            {'id':'book',    'weight':3},  {'id':'scatter', 'weight':6},  # 🔮 Ra scatter
+        ],
+        'payouts':    {'scarab':2,'eye':3,'jar':5,'eagle':8,'cat':15,'pharaoh':40,'book':125},
+        'free_spins': 10,
+        'fs_mult':    2,
+    },
+    'space': {
+        'symbols': [
+            {'id':'planet',  'weight':28}, {'id':'comet',   'weight':22},
+            {'id':'alien',   'weight':17}, {'id':'rocket',  'weight':11},
+            {'id':'stars',   'weight':8},  {'id':'moon',    'weight':5},
+            {'id':'gem',     'weight':3},  {'id':'scatter', 'weight':6},  # 🌀 wormhole scatter
+        ],
+        'payouts':    {'planet':2,'comet':3,'alien':5,'rocket':8,'stars':15,'moon':40,'gem':125},
+        'free_spins': 8,
+        'fs_mult':    3,  # space has 3× for higher excitement
+    },
+}
+SLOT_PAYLINES = [
+    [(0,0),(1,0),(2,0)],  # top row
+    [(0,1),(1,1),(2,1)],  # middle row
+    [(0,2),(1,2),(2,2)],  # bottom row
+    [(0,0),(1,1),(2,2)],  # diagonal ↘
+    [(0,2),(1,1),(2,0)],  # diagonal ↗
+]
+
+def _slot_spin(theme_id, include_scatter=True):
+    theme   = SLOT_THEMES.get(theme_id, SLOT_THEMES['fruits'])
+    syms    = theme['symbols'] if include_scatter else [s for s in theme['symbols'] if s['id'] != 'scatter']
+    ids     = [s['id'] for s in syms]
+    weights = [s['weight'] for s in syms]
+    return [[random.choices(ids, weights=weights)[0] for _ in range(3)] for _ in range(3)]
+
 def _get_streak_mode(db, pid):
     row = db.execute('SELECT streak_mode FROM players WHERE id=?', (pid,)).fetchone()
     if not row: return 'normal'
@@ -1300,6 +1352,96 @@ def game_bj_action(gid):
         state['payout']  = payout
         state['net']     = payout - bet  # bet is doubled if they doubled
     return jsonify(state)
+
+# ─── Slots ───────────────────────────────────────────────────────────────────
+
+@app.route('/api/points/<int:pid>/slots', methods=['POST'])
+def game_slots(pid):
+    d        = request.json or {}
+    db       = get_db()
+    bet, err = _get_bet(d, pid, db)
+    if err: return err
+    theme_id = d.get('theme', 'fruits')
+    if theme_id not in SLOT_THEMES:
+        theme_id = 'fruits'
+    _atomic_deduct_points(db, pid, bet, f'Slots panos ({theme_id})')
+    streak = _get_streak_mode(db, pid)
+    grid   = _slot_spin(theme_id)
+    theme  = SLOT_THEMES[theme_id]
+
+    def calc_wins(g):
+        wins = []
+        for i, line in enumerate(SLOT_PAYLINES):
+            cells = [g[col][row] for col, row in line]
+            if cells[0] == cells[1] == cells[2] and cells[0] != 'scatter':
+                mult = theme['payouts'].get(cells[0], 0)
+                wins.append({'line': i, 'symbol': cells[0], 'mult': mult,
+                             'cells': [[col, row] for col, row in line]})
+        return wins
+
+    def count_scatters(g):
+        positions = []
+        for col in range(3):
+            for row in range(3):
+                if g[col][row] == 'scatter':
+                    positions.append([col, row])
+        return positions
+
+    wins = calc_wins(grid)
+    scatter_positions = count_scatters(grid)
+
+    if streak == 'lose' and (wins or len(scatter_positions) >= 3):
+        for _ in range(10):
+            grid = _slot_spin(theme_id)
+            wins = calc_wins(grid)
+            scatter_positions = count_scatters(grid)
+            if not wins and len(scatter_positions) < 3:
+                break
+    elif streak == 'win' and not wins:
+        sym = theme['symbols'][0]['id']
+        grid[0][1] = grid[1][1] = grid[2][1] = sym
+        wins = calc_wins(grid)
+        scatter_positions = count_scatters(grid)
+
+    total_mult = sum(w['mult'] for w in wins)
+    payout     = bet * total_mult
+
+    # ── Free spins bonus ──────────────────────────────────────────────────────
+    free_spins_triggered = len(scatter_positions) >= 3
+    fs_count    = theme['free_spins'] if free_spins_triggered else 0
+    fs_mult     = theme['fs_mult']    if free_spins_triggered else 1
+    fs_results  = []
+    bonus_payout = 0
+    if free_spins_triggered:
+        for _ in range(fs_count):
+            fg = _slot_spin(theme_id, include_scatter=False)
+            fw = calc_wins(fg)
+            fm = sum(w['mult'] for w in fw)
+            fp = bet * fm * fs_mult
+            bonus_payout += fp
+            fs_results.append({'grid': fg, 'wins': fw, 'payout': fp})
+
+    total_payout = payout + bonus_payout
+    net = total_payout - bet
+    if total_payout > 0:
+        _add_points(db, pid, total_payout, f'Slots voitto ({theme_id})')
+    db.commit()
+    bal = db.execute('SELECT points FROM players WHERE id=?', (pid,)).fetchone()['points'] or 0
+    return jsonify({
+        'grid':                 grid,
+        'wins':                 wins,
+        'total_mult':           total_mult,
+        'bet':                  bet,
+        'payout':               payout,
+        'net':                  net,
+        'points':               bal,
+        'scatter_positions':    scatter_positions,
+        'free_spins_triggered': free_spins_triggered,
+        'free_spin_count':      fs_count,
+        'free_spin_mult':       fs_mult,
+        'free_spin_results':    fs_results,
+        'bonus_payout':         bonus_payout,
+    })
 
 # ─── Streak mode (admin) ─────────────────────────────────────────────────────
 
